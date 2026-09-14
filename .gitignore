@@ -1,0 +1,6 @@
+*.token.txt
+.netlify-deploy-token.txt
+.env
+*.key
+backup-*.json
+*.pdf
