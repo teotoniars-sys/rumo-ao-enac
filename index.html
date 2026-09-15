@@ -5581,6 +5581,17 @@ async function gemini(prompt,imgs){
   throw new Error("Falha na IA: "+ultErro+". Verifique a chave na aba Ajustes e sua conexão.");
 }
 /* ============ ABA PADRÕES FGV ============ */
+/* ===== Seções recolhíveis da aba Padrões FGV (a página estava longa demais) ===== */
+function secAberta(k){ return !((S.secRec||{})[k]); }
+function secBtnHTML(k){ return `<button class="acao sec mini" onclick="secToggle('${k}')" style="float:right;margin-left:10px;font-weight:600">${secAberta(k)?"▾ recolher":"▸ mostrar"}</button>`; }
+function secToggle(k){
+  S.secRec=S.secRec||{}; S.secRec[k]=secAberta(k); salvar();
+  var a=document.getElementById("sec-"+k), antes=a?a.getBoundingClientRect().top:null;
+  rFgv();
+  var d=document.getElementById("sec-"+k);
+  if(d&&antes!==null) window.scrollBy(0,d.getBoundingClientRect().top-antes); // mantém o título parado
+}
+function secCorpo(k,corpo){ return secAberta(k)?corpo:`<p class="mut" style="font-style:italic;margin:6px 0 0">Recolhida — clique em <b>▸ mostrar</b> para abrir.</p>`; }
 function rFgv(){
   const el=document.getElementById("aba-fgv");
   let html=`<div class="card"><h2>🎯 Como a FGV cobra o ENAC</h2>
@@ -5613,7 +5624,7 @@ function rFgv(){
 
   const jurisAll=JURIS.map((j,i)=>({ref:j[0],tese:j[1],onde:j[2],user:false,i:i}))
     .concat(S.jurisExtra.map((j,i)=>({ref:j.ref,tese:j.tese,onde:j.onde||"acréscimo meu",link:j.link,user:true,idx:i})));
-  html+=`<div class="card"><h2>⚖️ Jurisprudência obrigatória</h2>
+  html+=`<div class="card"><h2 id="sec-juris">⚖️ Jurisprudência obrigatória ${secBtnHTML("juris")}</h2><div style="clear:both"></div>`+secCorpo("juris",`
    <p class="mut" style="margin-bottom:8px">Clique em <b style="color:var(--verde)">🃏 criar</b> na linha de um precedente para gerar um flashcard dele — pode criar <b>vários</b> por precedente. Na prévia você escolhe a <b>área do Direito</b> e confirma; o cartão vai automaticamente para a aba Flashcards.</p>
    <div style="overflow-x:auto"><table class="tb"><tr><th>Precedente</th><th>Tese</th><th>Onde caiu</th><th>Flashcard</th></tr>${jurisAll.map(j=>{const jc=cardsDoJuris(j.ref);return `<tr><td style="white-space:nowrap"><a href="${j.link||bdd(j.ref)}" target="_blank" title="Abrir no Buscador Dizer o Direito"><b>${esc(j.ref)}</b> ⚖️</a>${j.user?` <a href="#" style="color:#c05336" onclick="delJuris(${j.idx});return false" title="apagar">✕</a>`:""}</td><td>${j.user?"✍️ ":""}${linkJuris(esc(j.tese))}</td><td class="mut">${esc(j.onde)}</td><td style="text-align:center;white-space:nowrap">${jc.length?jc.map(c=>`<div style="margin-bottom:4px"><span class="tag" style="background:${(MAT[c.m]||MAT.R).c};font-size:10px;padding:1px 7px;vertical-align:middle">${(MAT[c.m]||MAT.R).n}</span> <a href="#" onclick="verJuris('${c.id}');return false" style="text-decoration:none;color:var(--verde-esc);font-weight:600" title="ver como este flashcard aparece na revisão">👁️ ver</a></div>`).join(""):""}<a href="#" title="criar flashcard deste precedente (pode criar vários)" onclick="abrirJurisCard('${j.user?"u":"b"}',${j.user?j.idx:j.i});return false" style="text-decoration:none;color:var(--verde);font-weight:600">🃏 ${jc.length?"criar outro":"criar"}</a>${jc.length?`<div class="mut" style="font-size:10px;margin-top:3px;color:var(--verde-esc)">✅ ${jc.length} flashcard(s) criado(s)</div>`:""}</td></tr>`;}).join("")}</table></div>
    ${verJurisHTML()}
@@ -5627,16 +5638,16 @@ function rFgv(){
      <div class="grid2" style="margin-top:6px">
        <input type="text" id="jur-onde" placeholder="Onde caiu / observação (opcional)">
        <input type="text" id="jur-link" placeholder="Link direto do julgado (opcional — cole a URL)"></div>
-     <div class="dois-botoes"><button class="acao" onclick="addJuris()">Adicionar à tabela</button></div></div></div>`;
+     <div class="dois-botoes"><button class="acao" onclick="addJuris()">Adicionar à tabela</button></div></div>`)+`</div>`;
 
-  html+=`<div class="card"><h2>📚 Leis para ler na íntegra (ranking de prioridade)</h2><div style="overflow-x:auto"><table class="tb"><tr><th>Lei / Norma</th><th>Prioridade</th><th>Por quê</th><th>Flashcard</th></tr>${LEIS.map((l,i)=>`<tr><td><b>${esc(l[0])}</b></td><td style="white-space:nowrap">${l[1]}</td><td class="mut">${esc(l[2])}</td><td style="text-align:center;white-space:nowrap"><a href="#" title="criar um flashcard sobre esta lei (pode criar vários)" onclick="abrirLeiCard(${i});return false" style="text-decoration:none;color:var(--verde);font-weight:600">🃏 criar</a></td></tr>`).join("")}</table></div>
+  html+=`<div class="card"><h2 id="sec-leis">📚 Leis para ler na íntegra (ranking de prioridade) ${secBtnHTML("leis")}</h2><div style="clear:both"></div>`+secCorpo("leis",`<div style="overflow-x:auto"><table class="tb"><tr><th>Lei / Norma</th><th>Prioridade</th><th>Por quê</th><th>Flashcard</th></tr>${LEIS.map((l,i)=>`<tr><td><b>${esc(l[0])}</b></td><td style="white-space:nowrap">${l[1]}</td><td class="mut">${esc(l[2])}</td><td style="text-align:center;white-space:nowrap"><a href="#" title="criar um flashcard sobre esta lei (pode criar vários)" onclick="abrirLeiCard(${i});return false" style="text-decoration:none;color:var(--verde);font-weight:600">🃏 criar</a></td></tr>`).join("")}</table></div>
    ${artEdit&&artEdit.indexOf("leilei:")===0?cardEditorHTML(artEdit):""}
    <p class="mut" style="margin-top:8px">Clique em <b style="color:var(--verde)">🃏 criar</b> para começar um flashcard sobre a lei (você escreve a pergunta/resposta, escolhe a área e envia aos Flashcards).</p>
-   <p class="mut" style="margin-top:8px">⚠️ <b>Regra dos 90 dias (item 8.8.1 do edital):</b> normas que entrarem em vigor a menos de 90 dias da prova (≈ após 10/08/2026) NÃO são cobradas; normas revogadas nesse período PODEM ser cobradas.</p>
-   <h3 style="margin-top:14px">📕 Radiografia das leis — como a FGV cobrou nas 3 provas</h3>
+   <p class="mut" style="margin-top:8px">⚠️ <b>Regra dos 90 dias (item 8.8.1 do edital):</b> normas que entrarem em vigor a menos de 90 dias da prova (≈ após 10/08/2026) NÃO são cobradas; normas revogadas nesse período PODEM ser cobradas.</p>`)+`
+   <h3 id="sec-radio" style="margin-top:14px">📕 Radiografia das leis — como a FGV cobrou nas 3 provas ${secBtnHTML("radio")}</h3><div style="clear:both"></div>`+secCorpo("radio",`
    <p class="mut" style="margin-bottom:6px">Cada lei abre um painel no modo revisão: leia o caso e as opções, tente responder e só então clique em "Ver resposta". Você pode acrescentar suas próprias questões em cada lei.</p>
    <div style="margin-bottom:8px"><button class="acao sec mini" onclick="imprimirRadiografia()">🖨️ Imprimir TODAS as questões (todas as leis)</button></div>
-   ${LEIS_RADIO.map(radiografiaHTML).join("")}</div>`;
+   ${LEIS_RADIO.map(radiografiaHTML).join("")}`)+`</div>`;
 
   html+=`<div class="card"><h2>🎯 Meus artigos para memorizar</h2>
    <p class="mut" style="margin-bottom:8px">Artigos-chave de cada lei (as 4 da radiografia + as que você criar), com a pegadinha recorrente. Clique em ➜/🃏 para ver e enviar o flashcard. Cada cartão mostra a lei a que pertence — dá para treinar por lei ou por área na aba Flashcards.</p>
@@ -5823,12 +5834,29 @@ function addRadioSimples(id){
   if(msg){msg.style.display="block";msg.textContent="✅ Adicionada à Radiografia e aos Flashcards! Já pode lançar a próxima ("+S.radioExtra[id].filter(function(x){return x.simples;}).length+" suas questões nesta lei).";}
   if(fe)fe.focus();
 }
+function qArtItemHTML(lawId,x,i){
+  return `<div class="ex" style="margin:6px 0">${destaque(esc(x.f||""))}<div style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--borda)">✅ <b>Resposta:</b> ${x.b?destaque(esc(x.b)):'<span class="mut">(sem)</span>'}</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:14px"><a href="#" style="color:var(--verde-esc);font-size:.85rem;font-weight:600" onclick="editarQ('${lawId}',${i});return false">✏️ editar / acrescentar fundamentação</a><a href="#" style="color:#c05336;font-size:.85rem" onclick="delRadioQ('${lawId}',${i});return false">apagar questão</a></div></div>`;
+}
 function addQArt(lawId,art,g){
   var fe=document.getElementById("qa-f-"+g),be=document.getElementById("qa-b-"+g);
   var it=salvarQuestao(lawId,(fe?fe.value:""),(be?be.value:""),art,"","");
   if(!it)return;
-  qArtAberto=art; rFgv();
-  setTimeout(function(){var e=document.getElementById("qa-f-"+g);if(e)e.scrollIntoView({block:"center"});},60);
+  qArtAberto=art;
+  var box=document.getElementById("qabox-"+g);
+  if(!box){rFgv();return;}
+  // insere a questão nova logo acima do formulário e compensa o deslocamento,
+  // para que o formulário continue exatamente onde está (nada de rolar sozinho)
+  var antes=box.getBoundingClientRect().top;
+  box.insertAdjacentHTML("beforebegin",qArtItemHTML(lawId,it,S.radioExtra[lawId].length-1));
+  window.scrollBy(0,box.getBoundingClientRect().top-antes);
+  if(fe)fe.value="";if(be)be.value="";
+  var lista=(S.radioExtra[lawId]||[]).filter(function(x){return x.simples;});
+  var n=lista.filter(function(x){return (x.art||"")===art;}).length;
+  var cn=document.getElementById("qan-"+g);if(cn)cn.textContent=" · "+n+" questão(ões)";
+  var bn=document.getElementById("blocon-"+lawId);if(bn)bn.textContent=" · "+lista.length+" questão(ões)";
+  var msg=document.getElementById("qa-msg-"+g);
+  if(msg){msg.style.display="block";msg.textContent="✅ Lançada! Já pode escrever a próxima ("+n+" neste artigo). A página não sai do lugar.";}
+  if(fe)fe.focus();
 }
 function addRadioQ(id){
   var gv=function(k){var e=document.getElementById("rq-"+k+"-"+id);return e?(e.value||"").trim():"";};
@@ -5988,10 +6016,10 @@ function bancoArtigosHTML(lawId,nomeCurto,artigos,aberta){
   var _bAberto=(typeof blocoAberto!=="undefined"&&blocoAberto[lawId]);
   var otog=lazyEligible?` ontoggle="blocoToggle('${lawId}',this.open)"`:"";
   if(lazyEligible&&aberta===false&&!_bAberto){
-    return `<details class="peg"${otog} style="margin-bottom:12px;background:rgba(46,125,82,.05);border:1.5px solid var(--verde)"><summary><b>📊 Radiografia por artigo — ${esc(nomeCurto)}</b>${totalSimples?` · <span style="color:var(--verde-esc)">${totalSimples} questão(ões)</span>`:""} <span class="mut" style="font-weight:400">(${artigos.length} artigos — clique para abrir)</span></summary><p class="mut" style="padding:10px">Abrindo…</p></details>`;
+    return `<details class="peg"${otog} style="margin-bottom:12px;background:rgba(46,125,82,.05);border:1.5px solid var(--verde)"><summary><b>📊 Radiografia por artigo — ${esc(nomeCurto)}</b><span id="blocon-${lawId}" style="color:var(--verde-esc)">${totalSimples?` · ${totalSimples} questão(ões)`:""}</span> <span class="mut" style="font-weight:400">(${artigos.length} artigos — clique para abrir)</span></summary><p class="mut" style="padding:10px">Abrindo…</p></details>`;
   }
   var abreBloco=lazyEligible?(_bAberto?" open":""):(aberta===false?"":" open");
-  var h=`<details class="peg"${abreBloco}${otog} style="margin-bottom:12px;background:rgba(46,125,82,.05);border:1.5px solid var(--verde)"><summary><b>📊 Radiografia por artigo — ${esc(nomeCurto)}</b>${totalSimples?` · <span style="color:var(--verde-esc)">${totalSimples} questão(ões)</span>`:""}${aberta===false&&!lazyEligible?' <span class="mut" style="font-weight:400">(recolhida — clique para abrir)</span>':""}</summary>
+  var h=`<details class="peg"${abreBloco}${otog} style="margin-bottom:12px;background:rgba(46,125,82,.05);border:1.5px solid var(--verde)"><summary><b>📊 Radiografia por artigo — ${esc(nomeCurto)}</b><span id="blocon-${lawId}" style="color:var(--verde-esc)">${totalSimples?` · ${totalSimples} questão(ões)`:""}</span>${aberta===false&&!lazyEligible?' <span class="mut" style="font-weight:400">(recolhida — clique para abrir)</span>':""}</summary>
     <p class="mut" style="margin:8px 0">Cada artigo mostra o seu <b>texto</b>; abra e lance as questões que caíram (pergunta na frente, resposta no verso). Você vê <b>quantas por artigo</b> e <b>como</b> foram cobradas, e cada questão vira flashcard.</p>
     <div style="margin:0 0 10px;display:flex;flex-wrap:wrap;gap:6px"><button class="acao sec mini" onclick="imprimirPorArtigo('${lawId}',false)">🖨️ Imprimir a LEI TODA (artigos + questões)</button><button class="acao sec mini" onclick="imprimirPorArtigo('${lawId}',true)">🖨️ Imprimir SÓ os artigos que caíram (+ questões)</button></div>`;
   var rank=Object.keys(cont).filter(function(a){return a!=="(sem artigo)";}).sort(function(a,b){return cont[b]-cont[a];});
@@ -5999,7 +6027,7 @@ function bancoArtigosHTML(lawId,nomeCurto,artigos,aberta){
   artigos.forEach(function(art){
     var qs=[];ex.forEach(function(x,i){if(x.simples&&(x.art||"")===art)qs.push({x:x,i:i});});
     var n=qs.length,aberto=(qArtAberto===art),g=lawId+"_"+art.replace(/[^a-z0-9]/gi,""),texto=mostraTxt(art);
-    h+=`<details class="peg" style="margin-bottom:5px"${aberto?" open":""}><summary><b>${esc(art)}</b>${n?` <span style="color:var(--verde-esc);font-weight:700">· ${n} questão(ões)</span>`:""}<div style="font-weight:400;margin-top:4px;white-space:pre-wrap;line-height:1.55;color:var(--tinta)">${texto?destaque(esc(texto)):'<i class="mut">toque em "editar texto" para escrever o artigo</i>'}</div></summary>`;
+    h+=`<details class="peg" style="margin-bottom:5px"${aberto?" open":""}><summary><b>${esc(art)}</b><span id="qan-${g}" style="color:var(--verde-esc);font-weight:700">${n?` · ${n} questão(ões)`:""}</span><div style="font-weight:400;margin-top:4px;white-space:pre-wrap;line-height:1.55;color:var(--tinta)">${texto?destaque(esc(texto)):'<i class="mut">toque em "editar texto" para escrever o artigo</i>'}</div></summary>`;
     if(textoEdit===lawId+"|"+art){
       h+=`<div style="border:1px solid var(--borda);border-radius:12px;padding:10px;margin-top:6px;background:var(--card)">
         <label class="mut" style="display:block;font-weight:600">Texto do ${esc(art)} (corrija/complete e pinte os termos importantes)</label>
@@ -6019,17 +6047,18 @@ function bancoArtigosHTML(lawId,nomeCurto,artigos,aberta){
           ${corToolbar()}
           <div class="dois-botoes" style="margin-top:8px"><button class="acao" onclick="salvarQEdit('${lawId}',${o.i})">Salvar ✅</button><button class="acao sec" onclick="cancelarQEdit()">Cancelar</button></div></div>`;
       }else{
-        h+=`<div class="ex" style="margin:6px 0">${destaque(esc(o.x.f||""))}<div style="margin-top:5px;padding-top:5px;border-top:1px dashed var(--borda)">✅ <b>Resposta:</b> ${o.x.b?destaque(esc(o.x.b)):'<span class="mut">(sem)</span>'}</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:14px"><a href="#" style="color:var(--verde-esc);font-size:.85rem;font-weight:600" onclick="editarQ('${lawId}',${o.i});return false">✏️ editar / acrescentar fundamentação</a><a href="#" style="color:#c05336;font-size:.85rem" onclick="delRadioQ('${lawId}',${o.i});return false">apagar questão</a></div></div>`;
+        h+=qArtItemHTML(lawId,o.x,o.i);
       }
     });
     if(aberto||n>0){
-      h+=`<div style="border:1px solid var(--borda);border-radius:12px;padding:12px;margin-top:6px;background:var(--card)">
+      h+=`<div id="qabox-${g}" style="border:1px solid var(--borda);border-radius:12px;padding:12px;margin-top:6px;background:var(--card)">
         <label class="mut" style="display:block;font-weight:600">Pergunta (frente do cartão) — a questão que caiu sobre ${esc(art)}</label>
         <textarea id="qa-f-${g}" style="margin-top:4px" placeholder="Cole aqui o enunciado da questão..."></textarea>
         <label class="mut" style="display:block;margin-top:8px;font-weight:600">Resposta (verso do cartão)</label>
         <textarea id="qa-b-${g}" style="margin-top:4px" placeholder="Gabarito + explicação/pegadinha"></textarea>
         ${corToolbar()}
         <div class="dois-botoes" style="margin-top:8px"><button class="acao" onclick="addQArt('${lawId}','${art}','${g}')">Lançar questão neste artigo ✅</button></div>
+        <p id="qa-msg-${g}" class="mut" style="display:none;margin-top:6px;color:var(--verde-esc);font-weight:600"></p>
         </div>`;
     }else{
       h+=`<div style="margin-top:6px"><a href="#" style="color:var(--verde-esc);font-size:.85rem;font-weight:600" onclick="abrirArt('${lawId}','${art}');return false">➕ lançar questão neste artigo</a></div>`;
