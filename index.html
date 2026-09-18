@@ -4545,6 +4545,91 @@ async function restaurarSnapshot(ts){
   }
   localStorage.setItem(LS,s.json);location.reload();
 }
+/* ===== MESCLAR uma versão guardada: ACRESCENTA só o que falta, nunca apaga nem substitui =====
+   Serve para quando o conteúdo de um aparelho não chegou na nuvem: em vez de voltar no tempo
+   (perdendo o que foi feito depois), traz apenas os itens que não existem no estado atual. */
+function _chaveItem(x){ return (x&&x.id!=null)?("id:"+x.id):("j:"+JSON.stringify(x)); }
+function _mesclarLista(atual,velha){
+  atual=atual||[];
+  var vistos={}; atual.forEach(function(x){ vistos[_chaveItem(x)]=1; });
+  var n=0;
+  (velha||[]).forEach(function(x){ var k=_chaveItem(x); if(vistos[k])return; vistos[k]=1; atual.push(x); n++; });
+  return {lista:atual, novos:n};
+}
+async function mesclarSnapshot(ts){
+  var snaps=await listarSnapshots(); var s=snaps.find(function(x){return x.t===ts;});
+  if(!s){alert("Versão não encontrada.");return;}
+  var velho; try{ velho=JSON.parse(s.json); }catch(e){ alert("Não consegui ler essa versão guardada."); return; }
+
+  // --- FLASHCARDS: pula os que já existem (mesmo id OU mesma origem/src) ---
+  var vistoId={}, vistoSrc={};
+  (S.cards||[]).forEach(function(c){ if(c.id!=null)vistoId[c.id]=1; if(c.src)vistoSrc[c.src]=1; });
+  var cardsNovos=[];
+  (velho.cards||[]).forEach(function(c){
+    if(c.id!=null&&vistoId[c.id])return;
+    if(c.src&&vistoSrc[c.src])return;
+    if(c.id!=null)vistoId[c.id]=1; if(c.src)vistoSrc[c.src]=1;
+    cardsNovos.push(c);
+  });
+
+  // --- QUESTÕES da Radiografia por artigo: identificadas pelo qid ---
+  var qNovas=0, porLei={};
+  var rNovo={}; Object.keys(velho.radioExtra||{}).forEach(function(lei){
+    var atuais=(S.radioExtra&&S.radioExtra[lei])||[];
+    var qids={}; atuais.forEach(function(x){ if(x.qid)qids[x.qid]=1; });
+    var add=[];
+    (velho.radioExtra[lei]||[]).forEach(function(x){ if(!x.qid||qids[x.qid])return; qids[x.qid]=1; add.push(x); });
+    if(add.length){ rNovo[lei]=add; qNovas+=add.length; porLei[lei]=add.length; }
+  });
+
+  // --- demais coleções da usuária (tudo aditivo) ---
+  var outras=["artigos","notas","pegExtra","jurisExtra","userLeis","galeria"], prev={}, totOutras=0;
+  outras.forEach(function(k){
+    var r=_mesclarLista((S[k]||[]).slice(), velho[k]);
+    prev[k]=r.novos; totOutras+=r.novos;
+  });
+  // textos de artigo que você escreveu/corrigiu (objeto lei -> artigo -> texto)
+  var txtNovos=0;
+  Object.keys(velho.textoArt||{}).forEach(function(lei){
+    Object.keys(velho.textoArt[lei]||{}).forEach(function(art){
+      if(!(S.textoArt&&S.textoArt[lei]&&S.textoArt[lei][art]!=null)) txtNovos++;
+    });
+  });
+
+  var total=cardsNovos.length+qNovas+totOutras+txtNovos;
+  if(!total){ alert("Essa versão não tem nada que já não esteja aqui.\n\nNada foi alterado."); return; }
+
+  var resumo="Trazer da versão de "+new Date(s.t).toLocaleString("pt-BR")+" o que está faltando aqui?\n\n"+
+    "• "+cardsNovos.length+" flashcard(s)\n"+
+    "• "+qNovas+" questão(ões) da Radiografia"+(Object.keys(porLei).length?" ("+Object.keys(porLei).map(function(l){return l+": "+porLei[l];}).join(", ")+")":"")+"\n"+
+    (totOutras?"• "+totOutras+" item(ns) de anotações/artigos/pegadinhas\n":"")+
+    (txtNovos?"• "+txtNovos+" texto(s) de artigo\n":"")+
+    "\nNADA é apagado nem substituído — só acrescenta.";
+  if(!confirm(resumo)) return;
+
+  await salvarSnapshot();                       // ponto de retorno antes de mexer
+  S.cards=(S.cards||[]).concat(cardsNovos);
+  S.radioExtra=S.radioExtra||{};
+  Object.keys(rNovo).forEach(function(lei){ S.radioExtra[lei]=(S.radioExtra[lei]||[]).concat(rNovo[lei]); });
+  outras.forEach(function(k){ S[k]=_mesclarLista(S[k]||[], velho[k]).lista; });
+  S.textoArt=S.textoArt||{};
+  Object.keys(velho.textoArt||{}).forEach(function(lei){
+    S.textoArt[lei]=S.textoArt[lei]||{};
+    Object.keys(velho.textoArt[lei]||{}).forEach(function(art){
+      if(S.textoArt[lei][art]==null) S.textoArt[lei][art]=velho.textoArt[lei][art];
+    });
+  });
+  if(typeof garantirNumeros==="function") garantirNumeros();
+  salvar();
+  if(typeof sbUser!=="undefined" && sbUser){
+    marcarSync("☁️ enviando...");
+    await subirEstado(true);                    // aqui S JÁ é o estado mesclado
+  }
+  alert("✅ Pronto! Acrescentados "+total+" item(ns):\n\n"+
+        "• "+cardsNovos.length+" flashcard(s)\n• "+qNovas+" questão(ões) da Radiografia\n\n"+
+        "Nada foi apagado. Se algo ficou estranho, dá para voltar em uma versão guardada.");
+  location.reload();
+}
 async function ativarBackupAuto(){
   if(!window.showSaveFilePicker){alert("Este navegador não suporta backup automático em arquivo. Use o Chrome, ou o botão 'Baixar backup'.");return}
   try{
@@ -6492,7 +6577,7 @@ async function renderSnapLista(){
   var snaps=await listarSnapshots();
   snaps.sort(function(a,b){return b.t-a.t;});
   if(!snaps.length){el.innerHTML='<p class="mut">Ainda não há versões guardadas — elas começam a ser salvas automaticamente conforme você usa o app. Volte aqui daqui a pouco.</p>';return;}
-  el.innerHTML='<div style="max-height:300px;overflow:auto"><table class="tb"><tr><th>Quando</th><th>Flashcards</th><th>Imagens</th><th></th></tr>'+snaps.map(function(s){return '<tr><td style="white-space:nowrap">'+new Date(s.t).toLocaleString("pt-BR")+'</td><td>'+(s.cards||0)+'</td><td>'+(s.galeria||0)+'</td><td><button class="acao sec mini" onclick="restaurarSnapshot('+s.t+')">↩️ Restaurar esta</button></td></tr>';}).join("")+'</table></div><p class="mut" style="margin-top:6px">A mais recente é sempre o seu estado atual. Restaurar uma versão antiga guarda a atual no histórico antes (dá para voltar).</p>';
+  el.innerHTML='<div style="max-height:300px;overflow:auto"><table class="tb"><tr><th>Quando</th><th>Flashcards</th><th>Imagens</th><th></th></tr>'+snaps.map(function(s){return '<tr><td style="white-space:nowrap">'+new Date(s.t).toLocaleString("pt-BR")+'</td><td>'+(s.cards||0)+'</td><td>'+(s.galeria||0)+'</td><td style="white-space:nowrap"><button class="acao sec mini" onclick="mesclarSnapshot('+s.t+')" title="Acrescenta o que existe nesta versao e nao existe agora. Nao apaga nada.">➕ Trazer só o que falta</button> <button class="acao sec mini" onclick="restaurarSnapshot('+s.t+')" title="Volta o app inteiro para esta versao, substituindo o conteudo atual.">↩️ Restaurar esta</button></td></tr>';}).join("")+'</table></div><p class="mut" style="margin-top:6px">A mais recente é sempre o seu estado atual. <b>➕ Trazer só o que falta</b> acrescenta o que existe naquela versão e não existe agora, <b>sem apagar nem substituir nada</b> — é o mais seguro, e o certo quando você fez coisas em dois computadores. <b>↩️ Restaurar esta</b> volta o app inteiro para aquela versão (o conteúdo de agora fica guardado no histórico antes, dá para voltar).</p>';
 }
 function salvarChave(){S.cfg.gk=document.getElementById("cfg-gk").value.trim();salvar();
   document.getElementById("cfg-teste").innerHTML='<div class="resposta-ia">Chave salva. Clique em "Testar conexão" para confirmar.</div>'}
