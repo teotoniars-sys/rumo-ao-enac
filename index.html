@@ -4534,6 +4534,15 @@ async function restaurarSnapshot(ts){
   if(!s){alert("Versão não encontrada.");return;}
   if(!confirm("Restaurar a versão de "+new Date(s.t).toLocaleString("pt-BR")+" ("+s.cards+" flashcards)?\n\nO conteúdo de agora será substituído — mas ele também fica guardado no histórico, então dá para voltar depois.")) return;
   await salvarSnapshot();                            // guarda o estado atual ANTES de trocar (para poder desfazer)
+  // A versão restaurada TEM de subir para a nuvem antes do reload: ao recarregar, o app
+  // baixa a nuvem por cima do localStorage, e sem isto a restauração se desfazia sozinha.
+  // Envia o JSON do snapshot direto (S ainda é o estado antigo nesta altura).
+  if(typeof sbUser!=="undefined" && sbUser){
+    marcarSync("☁️ enviando...");
+    var ok=await enviarArquivo(estadoPath(), new Blob([s.json],{type:"application/json"}), "application/json");
+    if(!ok){ marcarSync("⚠️ falha ao enviar"); alert("Não consegui enviar a versão restaurada para a nuvem.\n\nNADA foi alterado. Verifique a internet e tente de novo."); return; }
+    ultimoEnviado=s.json;
+  }
   localStorage.setItem(LS,s.json);location.reload();
 }
 async function ativarBackupAuto(){
