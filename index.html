@@ -5713,7 +5713,10 @@ function checkCompactoHTML(){
 }
 function cssImpressao(){
   const base=`body{font-family:'Segoe UI',Arial,sans-serif;color:#26313a;max-width:820px;margin:22px auto;padding:0 18px;line-height:1.6}h1{font-size:22px;color:#1f5c3b;margin-bottom:2px}.sub{color:#666;font-size:13px;margin-top:0}h2{font-size:16px;border-bottom:2px solid #ccc;margin:24px 0 10px;padding-bottom:4px}.q{margin:9px 0;padding:11px 14px;border:1px solid #e6ece8;border-left:5px solid #ccc;border-radius:10px;background:#fbfdfb;page-break-inside:avoid}.q .meta{font-size:11.5px;color:#6b7784;font-weight:700;margin-bottom:5px}.f{font-weight:700;margin:0;color:#1c2a22;font-size:15px;line-height:1.5}.v{margin:7px 0 0;color:#33413a;font-size:14px;white-space:pre-wrap;border-top:1px dashed #d6e0da;padding-top:7px;line-height:1.55}.v .lbl{display:inline-block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#9aa7b3;border-radius:5px;padding:1px 7px;margin-right:5px;font-weight:800}mark{background:#fff3a0;padding:0 3px;border-radius:3px}@media print{@page{margin:12mm}.q{break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
-  const compacto=`body{font-family:'Segoe UI',Arial,sans-serif;color:#1c2a22;max-width:none;margin:10px auto;padding:0 12px;line-height:1.34;font-size:11.5px}h1{font-size:15px;color:#1f5c3b;margin:0 0 2px}.sub{color:#666;font-size:10px;margin:0 0 6px}h2{font-size:12px;border-bottom:1px solid #bbb;margin:9px 0 3px;padding-bottom:1px}.it{margin:0 0 2px;text-align:justify;white-space:pre-wrap}.it .sep{color:#8a97a3}mark{background:#fff3a0;padding:0 2px}@media print{@page{margin:8mm}.it{break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+  // Texto corrido: mantém a caixinha, mas os itens correm um embaixo do outro.
+  // O que gastava papel era o "não quebrar entre páginas": um item que não cabia
+  // pulava inteiro para a folha seguinte e deixava metade da página em branco.
+  const compacto=`body{font-family:'Segoe UI',Arial,sans-serif;color:#1c2a22;max-width:none;margin:8px auto;padding:0 10px;line-height:1.32;font-size:11px}h1{font-size:15px;color:#1f5c3b;margin:0 0 2px}.sub{color:#666;font-size:10px;margin:0 0 6px}h2{font-size:12px;border-bottom:1px solid #bbb;margin:8px 0 3px;padding-bottom:1px;break-after:avoid}.q{margin:3px 0;padding:4px 7px;border:1px solid #e3e9e5;border-left:3px solid #ccc;border-radius:5px;background:#fff}.q .meta{font-size:9.5px;color:#6b7784;font-weight:700;margin:0 0 2px}.f{font-weight:700;margin:0;font-size:11px;line-height:1.3}.v{margin:2px 0 0;color:#33413a;font-size:10.5px;white-space:pre-wrap;border-top:1px dashed #dde5e0;padding-top:2px;line-height:1.3}.v .lbl{display:inline-block;font-size:8.5px;text-transform:uppercase;letter-spacing:.05em;color:#fff;background:#9aa7b3;border-radius:4px;padding:0 5px;margin-right:4px;font-weight:800}mark{background:#fff3a0;padding:0 2px}@media print{@page{margin:7mm}.q{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
   return `<style>${impCompacto?compacto:base}</style>`;
 }
 /* Impressão do Caderno de erros a partir do índice — agrupada por motivo do erro */
@@ -5728,9 +5731,7 @@ function cadernoErrosDocHTML(motSel,fBusca){
   let body=`<h1>Rumo ao ENAC — Caderno de erros</h1><p class="sub">${es.length} registro(s)${rot?" · motivo: "+esc(rot):""}${fBusca?' · busca: "'+esc(fBusca)+'"':""} · gerado em ${dt}</p>`;
   ordem.forEach(k=>{const M=MOTIVOS[k]||{n:"Sem classificação",c:"#94a3b8",e:"❔"};
     body+=`<h2 style="color:${M.c};border-color:${M.c}">${M.e} ${esc(M.n)} — ${grupos[k].length} erro(s)</h2>`;
-    grupos[k].forEach((e,i)=>{ body+= impCompacto
-      ? `<p class="it"><b style="color:${M.c}">${esc((MAT[e.m]||MAT.R).n)}${e.lei?" · "+esc(e.lei):""} · ${fmtBr(e.k)}</b>${e.t?" — <b>"+destaque(esc(e.t))+"</b>":""} <span class="sep">—</span> ${destaque(esc(e.d||""))}</p>`
-      : `<div class="q" style="border-left-color:${M.c}"><div class="meta">${i+1} · ${esc((MAT[e.m]||MAT.R).n)}${e.lei?' · <b style="color:'+M.c+'">'+esc(e.lei)+'</b>':""} · ${fmtBr(e.k)}</div>${e.t?'<p class="f">'+destaque(esc(e.t))+'</p>':""}<p class="v"><span class="lbl">O que errei</span> ${destaque(esc(e.d||""))}</p></div>`;});
+    grupos[k].forEach((e,i)=>{body+=`<div class="q" style="border-left-color:${M.c}"><div class="meta">${i+1} · ${esc((MAT[e.m]||MAT.R).n)}${e.lei?' · <b style="color:'+M.c+'">'+esc(e.lei)+'</b>':""} · ${fmtBr(e.k)}</div>${e.t?'<p class="f">'+destaque(esc(e.t))+'</p>':""}<p class="v"><span class="lbl">O que errei</span> ${destaque(esc(e.d||""))}</p></div>`;});
   });
   if(!es.length) body+=`<p>Nenhum erro no filtro atual.</p>`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Caderno de erros — Rumo ao ENAC (${dt})</title>${cssImpressao()}</head><body>${body}</body></html>`;
@@ -5749,9 +5750,7 @@ function indiceDocHTML(){
   let body=`<h1>Rumo ao ENAC — Índice de flashcards</h1><p class="sub">${lista.length} cartões${fMat?" · área: "+esc(MAT[fMat].n):""}${fLei?' · lei: '+esc(fLei):""}${fBusca?' · busca: "'+esc(fBusca)+'"':""} · gerado em ${dt}</p>`;
   areas.forEach(m=>{const M=MAT[m]||MAT.R;
     body+=`<h2 style="color:${M.c};border-color:${M.c}">${esc(M.n)} — ${grupos[m].length} cartão(ões)</h2>`;
-    grupos[m].forEach((c,i)=>{ body+= impCompacto
-      ? `<p class="it"><b style="color:${M.c}">${c.n?"Nº "+c.n:i+1}${c.lei?" · "+esc(c.lei):""}</b> — <b>${destaque(esc(c.f))}</b> <span class="sep">→</span> ${destaque(esc(c.b))}</p>`
-      : `<div class="q" style="border-left-color:${M.c}"><div class="meta">${i+1}${c.n?" · Nº "+c.n:""}${c.lei?' · <b style="color:'+M.c+'">'+esc(c.lei)+'</b>':""}</div><p class="f">${destaque(esc(c.f))}</p><p class="v"><span class="lbl">Resposta</span> ${destaque(esc(c.b))}</p></div>`;});
+    grupos[m].forEach((c,i)=>{body+=`<div class="q" style="border-left-color:${M.c}"><div class="meta">${i+1}${c.n?" · Nº "+c.n:""}${c.lei?' · <b style="color:'+M.c+'">'+esc(c.lei)+'</b>':""}</div><p class="f">${destaque(esc(c.f))}</p><p class="v"><span class="lbl">Resposta</span> ${destaque(esc(c.b))}</p></div>`;});
   });
   if(!lista.length) body+=`<p>Nenhum cartão no filtro atual.</p>`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Índice de flashcards — Rumo ao ENAC (${dt})</title>${cssImpressao()}</head><body>${body}</body></html>`;
