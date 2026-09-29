@@ -216,6 +216,12 @@ const MAT={
  G:{n:"Conhec. Gerais",c:"#64748b"},
  R:{n:"Revisão / Mista",c:"#3f6f5f"}
 };
+/* Por que errei — o diagnóstico que separa o erro caro (conteúdo) dos baratos (leitura e precisão) */
+const MOTIVOS={
+ conteudo:{n:"Falta de conteúdo",d:"não sabia a regra",e:"📕",c:"#c05336"},
+ pegadinha:{n:"Caí na pegadinha",d:"leitura da banca",e:"🪤",c:"#b07d1e"},
+ entreduas:{n:"Fiquei entre duas",d:"falta precisão na letra da lei",e:"⚖️",c:"#2563a8"}
+};
 const SIMULADOS={
  "2026-09-27":{t:"SIMULADO 1 — prova real do ENAC 2025.1 (100 questões, 5h, condições reais)",
   links:[["Prova comentada (Estratégia, PDF)","https://cj.estrategia.com/portal/wp-content/uploads/2025/09/26140328/Prova-comentada-ENAC.pdf"],["Questões no Qconcursos","https://www.qconcursos.com/questoes-de-concursos/provas/fgv-2025-enac-exame-nacional-dos-cartorios-1-exame"],["Gabarito definitivo (FGV)","https://conhecimento.fgv.br/sites/default/files/concursos/gabdefi_enac.pdf"]]},
@@ -4831,6 +4837,7 @@ function imprimirRadiografia(soLei){
   setTimeout(function(){try{w.focus();w.print();}catch(e){}},350);
 }
 function tag(m){const M=MAT[m]||MAT.R;return `<span class="tag" style="background:${M.c}">${M.n}</span>`}
+function tagMotivo(k){const M=MOTIVOS[k];return M?`<span class="tag" style="background:${M.c}" title="${M.d}">${M.e} ${M.n}</span>`:`<span class="tag" style="background:#94a3b8" title="ainda não classificado">sem classificação</span>`}
 /* ============ TOPO (chips) ============ */
 function rTopo(){
   const h=hojeKey();
@@ -5002,6 +5009,7 @@ function pp2(k){const p=progDe(k);p.fim=!p.fim;salvar();rCrono();rTopo()}
 /* ============ FLASHCARDS (revisão espaçada) ============ */
 const ESCADA=[1,3,7,15,30,60];
 let fila=[],cardAtual=null,virado=false,cardEdit=null,iaPreview=null,syncMsg="",idxOrdem=[],criouMsg="",manualM="N",manualLei="",revMat="",revLei="",fixarAL=false,qArtAberto="",textoEdit="",qEdit="",blocoAberto={};
+let erroCardId=null,erroCardMsg={},fMotivo="";   // registro de erro a partir do índice · filtro por motivo no Caderno
 /* placar da sessão de revisão */
 let sessOn=false,sessAc=0,sessEr=0,sessDif=0,sessIds=[],sessFim=null;
 function iniSessPlacar(){sessOn=true;sessAc=0;sessEr=0;sessDif=0;sessIds=[];sessFim=null;}
@@ -5233,7 +5241,7 @@ function rCards(){
           <button class="acao sec" onclick="salvarCardIdx('${c.id}')">Salvar e ficar aqui</button>
           <button class="acao sec" onclick="cardEdit=null;rCards()">Cancelar</button>
           <button class="acao sec" style="color:#c05336" onclick="apagarCard('${c.id}')">Apagar</button></div></div>`;
-        return `<div class="item-cad" id="idxcard-${c.id}"><div class="meta">${tag(c.m)} <b style="background:#eef3f8;border:1px solid #cdd9e6;border-radius:6px;padding:0 7px;color:#1f3a5f">Nº ${c.n||"—"}</b> ${c.lei?"· <b style='color:var(--verde-esc)'>"+esc(c.lei)+"</b> ":""}${c.tema?"· <span style='color:#7a5cc4;font-weight:600'>🏷️ "+esc(c.tema)+"</span> ":""}· revisão ${fmtBr(c.due)} · ${c.ivl||0}d <a href="#" style="margin-left:auto" onclick="editarIdx('${c.id}');return false">editar</a> <a href="#" style="color:#c05336" onclick="apagarCard('${c.id}');return false">apagar</a></div><b>${esc(c.f)}</b></div>`;
+        return `<div class="item-cad" id="idxcard-${c.id}"><div class="meta">${tag(c.m)} <b style="background:#eef3f8;border:1px solid #cdd9e6;border-radius:6px;padding:0 7px;color:#1f3a5f">Nº ${c.n||"—"}</b> ${c.lei?"· <b style='color:var(--verde-esc)'>"+esc(c.lei)+"</b> ":""}${c.tema?"· <span style='color:#7a5cc4;font-weight:600'>🏷️ "+esc(c.tema)+"</span> ":""}· revisão ${fmtBr(c.due)} · ${c.ivl||0}d <a href="#" style="margin-left:auto;color:#c05336;font-weight:600" onclick="abrirErroCard('${c.id}');return false">❌ errei esta</a> <a href="#" onclick="editarIdx('${c.id}');return false">editar</a> <a href="#" style="color:#c05336" onclick="apagarCard('${c.id}');return false">apagar</a></div><b>${esc(c.f)}</b>${errosDoCardHTML(c.id)}${erroCardId===c.id?formErroCardHTML(c):""}</div>`;
       }).join("")):`<p class="mut" style="font-style:italic">Nenhum cartão encontrado${fMat||fBusca?" com esse filtro":" ainda"}.</p>`)+
       `</div></div>`;
   }
@@ -5577,6 +5585,35 @@ function salvarCardIdxProximo(id){ // salva e já abre o PRÓXIMO cartão para e
   cardEdit=prox;salvar();rTopo();rCards();scrollIdxParaCard(prox||id);
   if(!prox)setTimeout(function(){alert("Este era o último cartão da lista. ✅");},50);
 }
+/* ===== Caderno de Erros a partir do índice de flashcards ===== */
+function errosDoCard(id){ return (S.erros||[]).filter(function(z){return z.cardId===id;}); }
+function errosDoCardHTML(id){
+  var es=errosDoCard(id); if(!es.length) return "";
+  return `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <span class="mut" style="font-size:.8rem">erro registrado:</span>${es.map(function(z){return tagMotivo(z.motivo);}).join(" ")}
+    <a href="#" class="mut" style="font-size:.78rem" onclick="irParaCaderno();return false">ver no Caderno →</a></div>`;
+}
+function formErroCardHTML(c){
+  return `<div style="border:1.5px solid #c05336;border-radius:12px;padding:12px;margin-top:8px;background:rgba(192,83,54,.06)">
+    <b style="color:#c05336">❌ Por que você errou este cartão?</b>
+    <p class="mut" style="margin:4px 0 8px;font-size:.85rem">A classificação é o que importa — é ela que mostra depois onde você perde mais pontos. O texto abaixo é opcional.</p>
+    <textarea id="errocard-d" placeholder="O que errei e qual a lição (opcional)" style="min-height:70px"></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${Object.keys(MOTIVOS).map(function(k){var M=MOTIVOS[k];
+      return `<button class="acao mini" style="background:${M.c};text-align:left;line-height:1.25" onclick="registrarErroCard('${c.id}','${k}')">${M.e} <b>${M.n}</b><br><span style="font-weight:400;font-size:.75rem;opacity:.92">${M.d}</span></button>`;}).join("")}</div>
+    <div style="margin-top:8px"><button class="acao sec mini" onclick="erroCardId=null;rCards()">Cancelar</button></div></div>`;
+}
+function abrirErroCard(id){ erroCardId=(erroCardId===id?null:id); cardEdit=null; rCards(); scrollIdxParaCard(id); }
+function registrarErroCard(cardId,motivo){
+  var c=(S.cards||[]).find(function(x){return x.id===cardId;}); if(!c)return;
+  S.erros=S.erros||[];
+  var d=((document.getElementById("errocard-d")||{}).value||"").trim();
+  var titulo=(c.tema||c.lei||"").trim();
+  if(!titulo){ var f=String(c.f||"").replace(/\s+/g," ").trim();
+    titulo=f.length>80?f.slice(0,80).replace(/\s+\S*$/,"")+"…":f; }   // corta em palavra inteira
+  S.erros.push({id:Date.now(),m:c.m||"N",t:titulo,d:d,k:hojeKey(),motivo:motivo,cardId:cardId});
+  erroCardId=null; salvar(); rTopo(); rCards(); scrollIdxParaCard(cardId);
+}
+function irParaCaderno(){ var b=[].slice.call(document.querySelectorAll("button")).find(function(x){return x.textContent.indexOf("Caderno")>=0;}); if(b)b.click(); }
 function indiceDocHTML(){
   const fMat=(document.getElementById("idx-mat")||{}).value||"";
   const fLei=(document.getElementById("idx-lei")||{}).value||"";
@@ -6258,10 +6295,12 @@ function rCaderno(){
   const el=document.getElementById("aba-caderno");
   const busca=(document.getElementById("cad-busca")||{}).value||"";
   const norm=s=>s.toLowerCase();
-  let html=`<div class="card"><h2>📕 Caderno de Erros</h2>
+  let html=resumoMotivosHTML();
+  html+=`<div class="card"><h2>📕 Caderno de Erros</h2>
    <p class="mut" style="margin-bottom:8px">Cada questão errada vira um registro aqui. O app usa isso para sugerir reforços — e você pode transformar o erro em flashcard com 1 clique.</p>
    <div class="grid2"><select id="erro-m">${Object.keys(MAT).map(m=>`<option value="${m}">${MAT[m].n}</option>`).join("")}</select>
    <input type="text" id="erro-t" placeholder="Tema (ex.: prazo do protesto)"></div>
+   <select id="erro-motivo" style="margin-top:8px"><option value="">Por que errei? — classifique (recomendado)</option>${Object.keys(MOTIVOS).map(k=>`<option value="${k}">${MOTIVOS[k].e} ${MOTIVOS[k].n} — ${MOTIVOS[k].d}</option>`).join("")}</select>
    <textarea id="erro-d" style="margin-top:8px" placeholder="O que errei e qual a lição (ex.: confundi 5 com 30 dias na solução negocial — Lei 14.711)"></textarea>
    ${corToolbar()}
    <div class="dois-botoes"><button class="acao" onclick="addErro()">Registrar erro</button></div>
@@ -6289,14 +6328,32 @@ function rCaderno(){
 function rCadernoLista(){
   const busca=((document.getElementById("cad-busca")||{}).value||"").toLowerCase();
   const li=document.getElementById("cad-lista");if(!li)return;
-  const erros=S.erros.filter(e=>!busca||(e.t+" "+e.d+" "+MAT[e.m].n).toLowerCase().includes(busca));
-  const notas=S.notas.filter(n=>!busca||(n.d+" "+(n.m?MAT[n.m].n:"")).toLowerCase().includes(busca));
-  let html=erros.slice().reverse().map(e=>`<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});return false">➜ virar flashcard</a> <a href="#" style="color:#c05336" onclick="delErro(${e.id});return false">apagar</a></div><b>${esc(e.t)}</b><br>${linkJuris(esc(e.d))}</div>`).join("");
+  const casaMotivo=e=>!fMotivo||(fMotivo==="__sem"?!e.motivo:e.motivo===fMotivo);
+  const erros=S.erros.filter(e=>casaMotivo(e)).filter(e=>!busca||(e.t+" "+e.d+" "+(MAT[e.m]||MAT.R).n+" "+((MOTIVOS[e.motivo]||{}).n||"")).toLowerCase().includes(busca));
+  const notas=(fMotivo?[]:S.notas).filter(n=>!busca||(n.d+" "+(n.m?MAT[n.m].n:"")).toLowerCase().includes(busca));
+  const classificarHTML=e=>e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(k=>`<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`).join("")}</div>`;
+  let html=erros.slice().reverse().map(e=>`<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} · ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});return false">➜ virar flashcard</a> <a href="#" style="color:#c05336" onclick="delErro(${e.id});return false">apagar</a></div><b>${esc(e.t)}</b><br>${linkJuris(esc(e.d))}${classificarHTML(e)}</div>`).join("");
   html+=notas.slice().reverse().map(n=>`<div class="item-cad"><div class="meta">📝 NOTA · ${n.m?tag(n.m)+" · ":""}${fmtBr(n.k)} <a href="#" style="margin-left:auto;color:#c05336" onclick="delNota(${n.id});return false">apagar</a></div>${linkJuris(esc(n.d))}</div>`).join("");
   li.innerHTML=html||'<p class="mut">Nada registrado ainda. Errou uma questão? Registre aqui — é o hábito que mais aprova.</p>';
 }
 function addErro(){const t=document.getElementById("erro-t").value.trim(),d=document.getElementById("erro-d").value.trim();
-  if(!t&&!d)return;S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey()});salvar();rCaderno()}
+  if(!t&&!d)return;const mot=((document.getElementById("erro-motivo")||{}).value)||"";
+  S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey(),motivo:mot});salvar();rCaderno()}
+function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;salvar();rCadernoLista()}
+function setMotivoFiltro(k){fMotivo=(fMotivo===k?"":k);rCaderno()}
+function resumoMotivosHTML(){
+  const es=S.erros||[]; if(!es.length) return "";
+  const cont={}; es.forEach(e=>{const k=e.motivo||"";cont[k]=(cont[k]||0)+1;});
+  const semClass=cont[""]||0;
+  const chip=(k)=>{const M=MOTIVOS[k],n=cont[k]||0,pct=es.length?Math.round(n*100/es.length):0;
+    return `<span class="chip" style="cursor:pointer;background:${M.c};color:#fff${fMotivo===k?";outline:3px solid #111;outline-offset:1px":""}" onclick="setMotivoFiltro('${k}')" title="${M.d} — clique para filtrar">${M.e} ${M.n}: <b>${n}</b> (${pct}%)</span>`;};
+  return `<div class="card" style="border:2px solid var(--verde)"><h2>🔎 Diagnóstico dos seus erros (${es.length})</h2>
+    <p class="mut" style="margin-bottom:8px">Clique num motivo para ver só aqueles erros. <b>Falta de conteúdo</b> é o caro (precisa estudar a matéria); <b>pegadinha</b> e <b>entre duas</b> são os baratos de corrigir — atacá-los costuma render mais pontos por hora de estudo.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${Object.keys(MOTIVOS).map(chip).join("")}
+      ${semClass?`<span class="chip" style="cursor:pointer;background:#94a3b8;color:#fff${fMotivo==="__sem"?";outline:3px solid #111;outline-offset:1px":""}" onclick="setMotivoFiltro('__sem')">sem classificação: <b>${semClass}</b></span>`:""}
+      ${fMotivo?`<a href="#" onclick="setMotivoFiltro('');return false" style="align-self:center">limpar filtro</a>`:""}</div>
+    ${semClass?`<p class="mut" style="margin-top:8px;font-size:.85rem">⚠️ ${semClass} erro(s) ainda sem motivo. Clique em <b>sem classificação</b> e classifique um a um ali embaixo — é uma tarde de trabalho que vale por semanas de estudo cego.</p>`:""}</div>`;
+}
 function delErro(id){S.erros=S.erros.filter(e=>e.id!==id);salvar();rCadernoLista()}
 function addNota(){const d=document.getElementById("nota-d").value.trim();if(!d)return;
   S.notas.push({id:Date.now(),d,m:(document.getElementById("nota-m")||{}).value||"",k:hojeKey()});salvar();rCaderno()}
@@ -6306,17 +6363,22 @@ function delNota(id){S.notas=S.notas.filter(n=>n.id!==id);salvar();rCadernoLista
 function cadernoDocHTML(tipo){
   const busca=tipo?"":((document.getElementById("cad-busca")||{}).value||"").toLowerCase();
   const itens=[];
-  S.erros.forEach(e=>itens.push({tipo:"Erro",k:e.k,m:e.m,titulo:e.t,texto:e.d}));
-  S.notas.forEach(n=>itens.push({tipo:"Anotação",k:n.k,m:n.m||"",titulo:"",texto:n.d}));
+  S.erros.forEach(e=>itens.push({tipo:"Erro",k:e.k,m:e.m,titulo:e.t,texto:e.d,motivo:e.motivo||""}));
+  S.notas.forEach(n=>itens.push({tipo:"Anotação",k:n.k,m:n.m||"",titulo:"",texto:n.d,motivo:""}));
+  // imprimindo só os erros, respeita o motivo selecionado na tela (para estudar um grupo de cada vez)
+  const motFiltro=(tipo==="Erro"&&fMotivo)?fMotivo:"";
   let lista=itens.filter(x=>!tipo||x.tipo===tipo)
+                 .filter(x=>!motFiltro||(motFiltro==="__sem"?!x.motivo:x.motivo===motFiltro))
                  .filter(x=>!busca||((x.titulo+" "+x.texto+" "+(x.m?MAT[x.m].n:"")).toLowerCase().includes(busca)));
   lista.sort((a,b)=>a.k<b.k?-1:a.k>b.k?1:0);
   const dt=new Date().toLocaleDateString("pt-BR");
   const titulo=tipo==="Erro"?"Caderno de Erros":(tipo==="Anotação"?"Anotações livres":"Meu Caderno");
-  let body=`<h1>Rumo ao ENAC — ${titulo}</h1><p class="sub">${lista.length} registro(s)${busca?' · filtro: "'+esc(busca)+'"':""} · gerado em ${dt}</p>`;
+  const rotMot=motFiltro?(motFiltro==="__sem"?"sem classificação":(MOTIVOS[motFiltro]||{}).n):"";
+  let body=`<h1>Rumo ao ENAC — ${titulo}</h1><p class="sub">${lista.length} registro(s)${rotMot?" · motivo: "+esc(rotMot):""}${busca?' · filtro: "'+esc(busca)+'"':""} · gerado em ${dt}</p>`;
   if(!lista.length) body+=`<p>${tipo?"Você ainda não registrou nada aqui.":"Nenhum registro no filtro atual."}</p>`;
-  else body+=`<table><thead><tr><th>Data</th><th>Área do Direito</th>${tipo?"":"<th>Tipo</th>"}<th>Registro</th></tr></thead><tbody>`+
-    lista.map(x=>`<tr><td style="white-space:nowrap">${fmtBr(x.k)}</td><td>${x.m?esc(MAT[x.m].n):"—"}</td>${tipo?"":"<td>"+x.tipo+"</td>"}<td>${x.titulo?"<b>"+destaque(esc(x.titulo))+"</b><br>":""}${destaque(esc(x.texto)).replace(/\n/g,"<br>")}</td></tr>`).join("")+`</tbody></table>`;
+  else body+=`<table><thead><tr><th>Data</th><th>Área do Direito</th>${tipo?"":"<th>Tipo</th>"}${tipo==="Erro"?"<th>Por que errei</th>":""}<th>Registro</th></tr></thead><tbody>`+
+    lista.map(x=>{const mot=x.motivo?(MOTIVOS[x.motivo]||{}).n:"";
+      return `<tr><td style="white-space:nowrap">${fmtBr(x.k)}</td><td>${x.m?esc(MAT[x.m].n):"—"}</td>${tipo?"":"<td>"+x.tipo+"</td>"}${tipo==="Erro"?'<td style="white-space:nowrap">'+(mot?esc(mot):"—")+"</td>":""}<td>${(!tipo&&mot)?"<i>("+esc(mot)+")</i><br>":""}${x.titulo?"<b>"+destaque(esc(x.titulo))+"</b><br>":""}${destaque(esc(x.texto)).replace(/\n/g,"<br>")}</td></tr>`;}).join("")+`</tbody></table>`;
   const css=`<style>body{font-family:'Segoe UI',Arial,sans-serif;color:#222;max-width:900px;margin:22px auto;padding:0 18px;line-height:1.5}h1{font-size:20px;color:#1f5c3b;margin-bottom:2px}.sub{color:#666;font-size:13px;margin-top:0}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}th{background:#eef5f0;color:#1f5c3b}tr{page-break-inside:avoid}mark{background:#fff3a0;padding:0 2px;border-radius:3px}@media print{@page{margin:12mm}}</style>`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${titulo} — Rumo ao ENAC (${dt})</title>${css}</head><body>${body}</body></html>`;
 }
