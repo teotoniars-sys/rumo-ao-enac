@@ -5042,6 +5042,7 @@ function pp2(k){const p=progDe(k);p.fim=!p.fim;salvar();rCrono();rTopo()}
 const ESCADA=[1,3,7,15,30,60];
 let fila=[],cardAtual=null,virado=false,cardEdit=null,iaPreview=null,syncMsg="",idxOrdem=[],criouMsg="",manualM="N",manualLei="",revMat="",revLei="",fixarAL=false,qArtAberto="",textoEdit="",qEdit="",blocoAberto={};
 let fMotivo="";   // filtro por motivo do erro (aba Caderno)
+let manualErros=false,manualErroLei="",manualErroMotivo="";   // "Caderno de erros" no criar manual (e o que o 🔒 fixa)
 /* placar da sessão de revisão */
 let sessOn=false,sessAc=0,sessEr=0,sessDif=0,sessIds=[],sessFim=null;
 function iniSessPlacar(){sessOn=true;sessAc=0;sessEr=0;sessDif=0;sessIds=[];sessFim=null;}
@@ -5220,19 +5221,19 @@ function rCards(){
     }
     var leisDl=Array.from(new Set((S.cards||[]).map(function(c){return c.lei;}).filter(Boolean).concat(LEIS_RADIO.map(function(l){return l.nome.split(" (")[0];})))).sort();
     html+=`<div class="card"><h2>➕ Criar card manualmente</h2>
-      <textarea id="novo-f" placeholder="Frente (pergunta / caso prático)"></textarea>
-      <textarea id="novo-b" style="margin-top:8px" placeholder="Verso (resposta + fundamento + pegadinha)"></textarea>
+      <textarea id="novo-f" placeholder="${manualErros?"Tema do erro (ex.: prazo do protesto)":"Frente (pergunta / caso prático)"}"></textarea>
+      <textarea id="novo-b" style="margin-top:8px" placeholder="${manualErros?"O que errei e qual a lição":"Verso (resposta + fundamento + pegadinha)"}"></textarea>
       <div class="grid2" style="margin-top:8px">
-        <div><label class="mut">Área do Direito</label><select id="novo-m" onchange="novoModoErro()" ${fixarAL?"disabled":""}>${Object.keys(MAT).map(m=>`<option value="${m}"${manualM===m?" selected":""}>${MAT[m].n}</option>`).join("")}<option value="__erros">📕 Caderno de erros</option></select></div>
-        <div id="wrap-lei"><label class="mut">Lei / tema (STF ou STJ)</label><input type="text" id="novo-lei" list="novo-lei-dl" value="${esc(manualLei)}" ${fixarAL?"disabled":""} placeholder="ex.: Lei 6.015/73 · STF Tema 809 · Súmula 377"></div>
-        <div id="wrap-erro-lei" hidden><label class="mut">Lei que errei</label><input type="text" id="novo-erro-lei" placeholder="ex.: Lei 9.492/97"></div></div>
-      <div id="wrap-motivo" hidden style="margin-top:8px"><label class="mut">Por que errei</label><select id="novo-motivo">${Object.keys(MOTIVOS).map(k=>`<option value="${k}">${MOTIVOS[k].e} ${MOTIVOS[k].n} — ${MOTIVOS[k].d}</option>`).join("")}</select></div>
+        <div><label class="mut">Área do Direito</label><select id="novo-m" onchange="novoModoErro()" ${fixarAL?"disabled":""}>${Object.keys(MAT).map(m=>`<option value="${m}"${(!manualErros&&manualM===m)?" selected":""}>${MAT[m].n}</option>`).join("")}<option value="__erros"${manualErros?" selected":""}>📕 Caderno de erros</option></select></div>
+        <div id="wrap-lei" ${manualErros?"hidden":""}><label class="mut">Lei / tema (STF ou STJ)</label><input type="text" id="novo-lei" list="novo-lei-dl" value="${esc(manualLei)}" ${fixarAL?"disabled":""} placeholder="ex.: Lei 6.015/73 · STF Tema 809 · Súmula 377"></div>
+        <div id="wrap-erro-lei" ${manualErros?"":"hidden"}><label class="mut">Lei que errei</label><input type="text" id="novo-erro-lei" value="${esc(manualErroLei)}" ${fixarAL?"disabled":""} placeholder="ex.: Lei 9.492/97"></div></div>
+      <div id="wrap-motivo" ${manualErros?"":"hidden"} style="margin-top:8px"><label class="mut">Por que errei</label><select id="novo-motivo" ${fixarAL?"disabled":""}>${Object.keys(MOTIVOS).map(k=>`<option value="${k}"${manualErroMotivo===k?" selected":""}>${MOTIVOS[k].e} ${MOTIVOS[k].n} — ${MOTIVOS[k].d}</option>`).join("")}</select></div>
       <datalist id="novo-lei-dl">${leisDl.map(function(l){return '<option value="'+esc(l)+'">';}).join("")}</datalist>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.9rem;cursor:pointer"><input type="checkbox" ${fixarAL?"checked":""} onchange="toggleFixar(this.checked)" style="width:18px;height:18px"> 🔒 <b>Fixar esta área e lei</b> (lançar vários seguidos sem risco de trocar)</label>
-      ${fixarAL?`<div class="ex" style="border:1.5px solid var(--verde);background:rgba(46,125,82,.12);color:var(--verde-esc);font-weight:700;margin-top:6px">🔒 Fixado: ${MAT[manualM]?MAT[manualM].n:manualM}${manualLei?" · "+esc(manualLei):""} — todos os novos cards vão para cá.</div>`:""}
+      ${fixarAL?`<div class="ex" style="border:1.5px solid var(--verde);background:rgba(46,125,82,.12);color:var(--verde-esc);font-weight:700;margin-top:6px">🔒 Fixado: ${manualErros?`📕 Caderno de erros${manualErroLei?" · "+esc(manualErroLei):""}${manualErroMotivo?" · "+esc((MOTIVOS[manualErroMotivo]||{}).n||""):""} — todos os novos registros vão para cá.`:`${MAT[manualM]?MAT[manualM].n:manualM}${manualLei?" · "+esc(manualLei):""} — todos os novos cards vão para cá.`}</div>`:""}
       ${corToolbar()}
       <p class="mut" style="margin-top:2px;font-size:.82rem">💡 Preenchendo a <b>lei/tema</b>, no índice abaixo você pode filtrar por ela e treinar só aquela norma no dia. O <b>Nº</b> (por área) é atribuído automaticamente.</p>
-      <div class="dois-botoes" style="margin-top:6px"><button class="acao" id="btn-criar" onclick="criarCard()">Adicionar card</button></div>
+      <div class="dois-botoes" style="margin-top:6px"><button class="acao" id="btn-criar" onclick="criarCard()">${manualErros?"Registrar erro e criar flashcard":"Adicionar card"}</button></div>
       ${criouMsg?`<div class="ex" style="border:1.5px solid var(--verde);background:rgba(46,125,82,.12);color:var(--verde-esc);font-weight:700;margin-top:8px">${criouMsg}</div>`:""}</div>`;
     html+=`<div class="card"><h2>♻️ Recuperar cartões de um backup</h2>
       <p class="mut" style="margin-bottom:8px">Perdeu cartões? Selecione um arquivo que você já baixou/imprimiu: um <b>índice de flashcards (.html)</b> ou um <b>backup completo (.json)</b>. O app repõe os cartões que estiverem faltando, <b>sem duplicar</b> os que já existem.</p>
@@ -5559,14 +5560,23 @@ function avaliar(nota){ // SM-2: 0=errei 1=difícil 2=acertei 3=fácil
   if(sessOn){ if(nota===0)sessEr++; else if(nota===1)sessDif++; else sessAc++; sessIds.push(c.id); }
   salvar();proximoCard()}
 function toggleFixar(on){
-  if(on){ var v=(document.getElementById("novo-m")||{}).value; if(v&&v!=="__erros")manualM=v;   // "Caderno de erros" não é área para fixar
-    manualLei=(((document.getElementById("novo-lei")||{}).value)||manualLei).trim(); }
+  if(on){ var v=(document.getElementById("novo-m")||{}).value;
+    if(v==="__erros"){                       // no Caderno de erros, o 🔒 fixa a LEI e o MOTIVO
+      manualErros=true;
+      manualErroLei=(((document.getElementById("novo-erro-lei")||{}).value)||manualErroLei).trim();
+      manualErroMotivo=(((document.getElementById("novo-motivo")||{}).value)||manualErroMotivo);
+    }else{
+      manualErros=false;
+      if(v)manualM=v;
+      manualLei=(((document.getElementById("novo-lei")||{}).value)||manualLei).trim();
+    } }
   fixarAL=!!on; rCards();
 }
 /* alterna o formulário entre "criar flashcard" e "registrar no Caderno de Erros",
    sem redesenhar a aba (senão o que ela já digitou na frente/verso se perderia) */
 function novoModoErro(){
   var erro=((document.getElementById("novo-m")||{}).value==="__erros");
+  manualErros=erro;   // lembra o modo, para sobreviver ao redesenho da aba
   var mostra=function(id,on){var e=document.getElementById(id);if(e)e.hidden=!on;};
   mostra("wrap-lei",!erro); mostra("wrap-erro-lei",erro); mostra("wrap-motivo",erro);
   var f=document.getElementById("novo-f"),b=document.getElementById("novo-b"),bt=document.getElementById("btn-criar");
@@ -5583,6 +5593,7 @@ function criarCard(){
     var mot=((document.getElementById("novo-motivo")||{}).value)||"";
     var leiErr=(((document.getElementById("novo-erro-lei")||{}).value)||"").trim();
     var mErr=manualM||"N";
+    manualErros=true; manualErroLei=leiErr; manualErroMotivo=mot;   // mantém lei e motivo para o próximo
     var eid=Date.now();
     var novoErro={id:eid,m:mErr,t:f,d:b,k:hojeKey(),motivo:mot,lei:leiErr};
     S.erros.push(novoErro);
