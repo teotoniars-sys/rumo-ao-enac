@@ -6377,7 +6377,9 @@ function rCadernoLista(){
 function addErro(){const t=document.getElementById("erro-t").value.trim(),d=document.getElementById("erro-d").value.trim();
   if(!t&&!d)return;const mot=((document.getElementById("erro-motivo")||{}).value)||"";
   S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey(),motivo:mot});salvar();rCaderno()}
-function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;salvar();
+function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;
+  const c=cardDoErro(e); if(c)c.lei=rotuloErro(e);   // mantém a etiqueta do flashcard em dia
+  salvar();rTopo();
   if(document.getElementById("cad-lista"))rCadernoLista(); else rCards();}
 function setMotivoFiltro(k){fMotivo=(fMotivo===k?"":k);rCaderno()}
 function resumoMotivosHTML(){
