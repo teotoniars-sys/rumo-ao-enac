@@ -5009,7 +5009,7 @@ function pp2(k){const p=progDe(k);p.fim=!p.fim;salvar();rCrono();rTopo()}
 /* ============ FLASHCARDS (revisão espaçada) ============ */
 const ESCADA=[1,3,7,15,30,60];
 let fila=[],cardAtual=null,virado=false,cardEdit=null,iaPreview=null,syncMsg="",idxOrdem=[],criouMsg="",manualM="N",manualLei="",revMat="",revLei="",fixarAL=false,qArtAberto="",textoEdit="",qEdit="",blocoAberto={};
-let erroCardId=null,erroCardMsg={},fMotivo="";   // registro de erro a partir do índice · filtro por motivo no Caderno
+let fMotivo="";   // filtro por motivo do erro (aba Caderno)
 /* placar da sessão de revisão */
 let sessOn=false,sessAc=0,sessEr=0,sessDif=0,sessIds=[],sessFim=null;
 function iniSessPlacar(){sessOn=true;sessAc=0;sessEr=0;sessDif=0;sessIds=[];sessFim=null;}
@@ -5208,20 +5208,32 @@ function rCards(){
     const fBusca=((document.getElementById("idx-busca")||{}).value||"").toLowerCase();
     const areasOrd=Object.keys(porArea).sort((a,b)=>(MAT[a]||MAT.R).n<(MAT[b]||MAT.R).n?-1:1);
     const leisList=Array.from(new Set([].concat(S.cards.map(c=>c.lei),S.cards.map(c=>c.tema)).filter(Boolean))).sort();
+    // === Caderno de erros dentro do índice: caixinha própria + motivos na lista de leis ===
+    const nErros=(S.erros||[]).length;
+    const motSel=(fLei.indexOf("__mot_")===0)?fLei.slice(6):"";
+    const modoErros=(fMat==="__erros")||!!motSel;
+    const errosFiltrados=!modoErros?[]:(S.erros||[])
+      .filter(e=>!motSel||(motSel==="sem"?!e.motivo:e.motivo===motSel))
+      .filter(e=>!fBusca||((e.t||"")+" "+(e.d||"")+" "+((MAT[e.m]||MAT.R).n)+" "+((MOTIVOS[e.motivo]||{}).n||"")).toLowerCase().includes(fBusca))
+      .slice().reverse();
     let lista=S.cards.slice().sort((a,b)=>{const na=(MAT[a.m]||MAT.R).n,nb=(MAT[b.m]||MAT.R).n;return na<nb?-1:na>nb?1:((a.n||0)-(b.n||0));})
       .filter(c=>(!fMat||c.m===fMat)&&(!fLei||c.lei===fLei||c.tema===fLei)&&(!fBusca||((c.f||"")+" "+(c.b||"")+" "+(c.tema||"")).toLowerCase().includes(fBusca)));
     html+=`<div class="card"><h2>📋 Índice dos flashcards — filtrar e treinar</h2>
-      <p class="mut" style="margin-bottom:8px">Filtre por <b>área</b> e/ou <b>lei</b> (ou busque), veja/corrija os cartões, e clique em <b>Treinar os filtrados</b> para revisar só esse conjunto. Clique em <b>editar</b> num cartão para corrigir a frente/verso ou trocar a área.<br>❌ <b>Errou um cartão?</b> Na lista aqui embaixo, cada um tem o link <b style="color:#c05336">errei esta</b> — ele registra o erro no Caderno já classificado (falta de conteúdo · pegadinha · fiquei entre duas), para você ver depois onde perde mais pontos.</p>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${areasOrd.map(m=>`<span class="chip" style="cursor:pointer${fMat===m?";outline:2px solid var(--verde)":""}" onclick="setIdxMat('${m}')">${tag(m)} <b>${porArea[m]}</b></span>`).join("")}</div>
+      <p class="mut" style="margin-bottom:8px">Filtre por <b>área</b> e/ou <b>lei</b> (ou busque), veja/corrija os cartões, e clique em <b>Treinar os filtrados</b> para revisar só esse conjunto. Clique em <b>editar</b> num cartão para corrigir a frente/verso ou trocar a área.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${areasOrd.map(m=>`<span class="chip" style="cursor:pointer${fMat===m?";outline:2px solid var(--verde)":""}" onclick="setIdxMat('${m}')">${tag(m)} <b>${porArea[m]}</b></span>`).join("")}<span class="chip" style="cursor:pointer${fMat==="__erros"?";outline:2px solid var(--verde)":""}" onclick="setIdxMat('__erros')" title="ver o seu Caderno de Erros aqui; use a lista ao lado para separar por motivo"><span class="tag" style="background:#c05336">📕 Caderno de erros</span> <b>${nErros}</b></span></div>
       <div class="grid2">
-        <select id="idx-mat" onchange="rCards()"><option value="">Todas as áreas (${S.cards.length})</option>${Object.keys(MAT).map(m=>`<option value="${m}" ${fMat===m?"selected":""}>${MAT[m].n}${porArea[m]?" ("+porArea[m]+")":""}</option>`).join("")}</select>
-        <select id="idx-lei" onchange="rCards()"><option value="">Todas as leis</option>${leisList.map(l=>`<option value="${esc(l)}" ${fLei===l?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
+        <select id="idx-mat" onchange="rCards()"><option value="">Todas as áreas (${S.cards.length})</option>${Object.keys(MAT).map(m=>`<option value="${m}" ${fMat===m?"selected":""}>${MAT[m].n}${porArea[m]?" ("+porArea[m]+")":""}</option>`).join("")}<option value="__erros" ${fMat==="__erros"?"selected":""}>📕 Caderno de erros (${nErros})</option></select>
+        <select id="idx-lei" onchange="rCards()"><option value="">Todas as leis</option>${leisList.map(l=>`<option value="${esc(l)}" ${fLei===l?"selected":""}>${esc(l)}</option>`).join("")}<optgroup label="📕 Caderno de erros — por motivo">${Object.keys(MOTIVOS).map(k=>`<option value="__mot_${k}" ${fLei==="__mot_"+k?"selected":""}>${MOTIVOS[k].e} ${MOTIVOS[k].n}</option>`).join("")}<option value="__mot_sem" ${fLei==="__mot_sem"?"selected":""}>sem classificação</option></optgroup></select></div>
       <input type="text" id="idx-busca" placeholder="🔍 Buscar tema ou palavra..." value="${esc(fBusca)}" oninput="rCards()" style="margin-top:8px">
-      <p class="mut" style="margin:8px 0 4px">${lista.length} cartão(ões)${fMat||fLei||fBusca?" no filtro":""}.</p>
+      ${modoErros
+        ?`<p class="mut" style="margin:8px 0 4px">📕 <b>${errosFiltrados.length} erro(s)</b> do seu Caderno${motSel?" · motivo: <b>"+(motSel==="sem"?"sem classificação":MOTIVOS[motSel].n)+"</b>":""}${fBusca?" · busca":""}.</p>
+      <div class="dois-botoes" style="margin:2px 0 8px"><button class="acao sec mini" onclick="limparFiltroErros()">↩ voltar aos flashcards</button></div>`
+        :`<p class="mut" style="margin:8px 0 4px">${lista.length} cartão(ões)${fMat||fLei||fBusca?" no filtro":""}.</p>
       <div class="dois-botoes" style="margin:2px 0 8px"><button class="acao" ${lista.length?"":"disabled style='opacity:.5'"} onclick="treinarFiltrados()">▶ Treinar os ${lista.length} filtrados</button>
       <button class="acao sec mini" onclick="exportarIndice('print')">🖨️ Imprimir / PDF</button>
-      <button class="acao sec mini" onclick="exportarIndice('download')">⬇️ Baixar</button></div>
+      <button class="acao sec mini" onclick="exportarIndice('download')">⬇️ Baixar</button></div>`}
       <div id="idx-lista-scroll" style="max-height:560px;overflow:auto">`+
+      (modoErros?listaErrosHTML(errosFiltrados,motSel):
       (lista.length?((idxOrdem=lista.map(function(c){return c.id;})),lista.map(c=>{
         if(cardEdit===c.id) return `<div class="item-cad" id="idxcard-${c.id}" style="border-color:var(--verde);background:rgba(46,125,82,.05)">
           <div class="meta" style="margin-bottom:4px">✏️ Editando <b style="background:#eef3f8;border:1px solid #cdd9e6;border-radius:6px;padding:0 7px;color:#1f3a5f">Nº ${c.n||"—"}</b> · ${tag(c.m)}</div>
@@ -5241,8 +5253,8 @@ function rCards(){
           <button class="acao sec" onclick="salvarCardIdx('${c.id}')">Salvar e ficar aqui</button>
           <button class="acao sec" onclick="cardEdit=null;rCards()">Cancelar</button>
           <button class="acao sec" style="color:#c05336" onclick="apagarCard('${c.id}')">Apagar</button></div></div>`;
-        return `<div class="item-cad" id="idxcard-${c.id}"><div class="meta">${tag(c.m)} <b style="background:#eef3f8;border:1px solid #cdd9e6;border-radius:6px;padding:0 7px;color:#1f3a5f">Nº ${c.n||"—"}</b> ${c.lei?"· <b style='color:var(--verde-esc)'>"+esc(c.lei)+"</b> ":""}${c.tema?"· <span style='color:#7a5cc4;font-weight:600'>🏷️ "+esc(c.tema)+"</span> ":""}· revisão ${fmtBr(c.due)} · ${c.ivl||0}d <a href="#" style="margin-left:auto;color:#c05336;font-weight:600" onclick="abrirErroCard('${c.id}');return false">❌ errei esta</a> <a href="#" onclick="editarIdx('${c.id}');return false">editar</a> <a href="#" style="color:#c05336" onclick="apagarCard('${c.id}');return false">apagar</a></div><b>${esc(c.f)}</b>${errosDoCardHTML(c.id)}${erroCardId===c.id?formErroCardHTML(c):""}</div>`;
-      }).join("")):`<p class="mut" style="font-style:italic">Nenhum cartão encontrado${fMat||fBusca?" com esse filtro":" ainda"}.</p>`)+
+        return `<div class="item-cad" id="idxcard-${c.id}"><div class="meta">${tag(c.m)} <b style="background:#eef3f8;border:1px solid #cdd9e6;border-radius:6px;padding:0 7px;color:#1f3a5f">Nº ${c.n||"—"}</b> ${c.lei?"· <b style='color:var(--verde-esc)'>"+esc(c.lei)+"</b> ":""}${c.tema?"· <span style='color:#7a5cc4;font-weight:600'>🏷️ "+esc(c.tema)+"</span> ":""}· revisão ${fmtBr(c.due)} · ${c.ivl||0}d <a href="#" style="margin-left:auto" onclick="editarIdx('${c.id}');return false">editar</a> <a href="#" style="color:#c05336" onclick="apagarCard('${c.id}');return false">apagar</a></div><b>${esc(c.f)}</b></div>`;
+      }).join("")):`<p class="mut" style="font-style:italic">Nenhum cartão encontrado${fMat||fBusca?" com esse filtro":" ainda"}.</p>`))+
       `</div></div>`;
   }
   el.innerHTML=html;
@@ -5557,6 +5569,7 @@ function importarCards(inp){
   r.readAsText(file);
 }
 function setIdxMat(m){const s=document.getElementById("idx-mat");if(s)s.value=(s.value===m?"":m);cardEdit=null;rCards()}
+function limparFiltroErros(){const a=document.getElementById("idx-mat"),b=document.getElementById("idx-lei");if(a)a.value="";if(b)b.value="";cardEdit=null;rCards()}
 function scrollIdxParaCard(id){
   var el=document.getElementById("idxcard-"+id),c=document.getElementById("idx-lista-scroll");
   if(!el||!c)return;
@@ -5585,35 +5598,14 @@ function salvarCardIdxProximo(id){ // salva e já abre o PRÓXIMO cartão para e
   cardEdit=prox;salvar();rTopo();rCards();scrollIdxParaCard(prox||id);
   if(!prox)setTimeout(function(){alert("Este era o último cartão da lista. ✅");},50);
 }
-/* ===== Caderno de Erros a partir do índice de flashcards ===== */
-function errosDoCard(id){ return (S.erros||[]).filter(function(z){return z.cardId===id;}); }
-function errosDoCardHTML(id){
-  var es=errosDoCard(id); if(!es.length) return "";
-  return `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-    <span class="mut" style="font-size:.8rem">erro registrado:</span>${es.map(function(z){return tagMotivo(z.motivo);}).join(" ")}
-    <a href="#" class="mut" style="font-size:.78rem" onclick="irParaCaderno();return false">ver no Caderno →</a></div>`;
+/* Lista do Caderno de Erros dentro do Índice dos flashcards (caixinha "Caderno de erros") */
+function listaErrosHTML(es,motSel){
+  if(!es.length) return `<p class="mut" style="font-style:italic">Nenhum erro${motSel?" com esse motivo":""} registrado ainda. Você registra na aba <b>Caderno</b>.</p>`;
+  return es.map(function(e){
+    var classificar=e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(function(k){return `<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`;}).join("")}</div>`;
+    return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} · ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ virar flashcard</a></div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${classificar}</div>`;
+  }).join("");
 }
-function formErroCardHTML(c){
-  return `<div style="border:1.5px solid #c05336;border-radius:12px;padding:12px;margin-top:8px;background:rgba(192,83,54,.06)">
-    <b style="color:#c05336">❌ Por que você errou este cartão?</b>
-    <p class="mut" style="margin:4px 0 8px;font-size:.85rem">A classificação é o que importa — é ela que mostra depois onde você perde mais pontos. O texto abaixo é opcional.</p>
-    <textarea id="errocard-d" placeholder="O que errei e qual a lição (opcional)" style="min-height:70px"></textarea>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${Object.keys(MOTIVOS).map(function(k){var M=MOTIVOS[k];
-      return `<button class="acao mini" style="background:${M.c};text-align:left;line-height:1.25" onclick="registrarErroCard('${c.id}','${k}')">${M.e} <b>${M.n}</b><br><span style="font-weight:400;font-size:.75rem;opacity:.92">${M.d}</span></button>`;}).join("")}</div>
-    <div style="margin-top:8px"><button class="acao sec mini" onclick="erroCardId=null;rCards()">Cancelar</button></div></div>`;
-}
-function abrirErroCard(id){ erroCardId=(erroCardId===id?null:id); cardEdit=null; rCards(); scrollIdxParaCard(id); }
-function registrarErroCard(cardId,motivo){
-  var c=(S.cards||[]).find(function(x){return x.id===cardId;}); if(!c)return;
-  S.erros=S.erros||[];
-  var d=((document.getElementById("errocard-d")||{}).value||"").trim();
-  var titulo=(c.tema||c.lei||"").trim();
-  if(!titulo){ var f=String(c.f||"").replace(/\s+/g," ").trim();
-    titulo=f.length>80?f.slice(0,80).replace(/\s+\S*$/,"")+"…":f; }   // corta em palavra inteira
-  S.erros.push({id:Date.now(),m:c.m||"N",t:titulo,d:d,k:hojeKey(),motivo:motivo,cardId:cardId});
-  erroCardId=null; salvar(); rTopo(); rCards(); scrollIdxParaCard(cardId);
-}
-function irParaCaderno(){ var b=[].slice.call(document.querySelectorAll("button")).find(function(x){return x.textContent.indexOf("Caderno")>=0;}); if(b)b.click(); }
 function indiceDocHTML(){
   const fMat=(document.getElementById("idx-mat")||{}).value||"";
   const fLei=(document.getElementById("idx-lei")||{}).value||"";
@@ -6339,7 +6331,8 @@ function rCadernoLista(){
 function addErro(){const t=document.getElementById("erro-t").value.trim(),d=document.getElementById("erro-d").value.trim();
   if(!t&&!d)return;const mot=((document.getElementById("erro-motivo")||{}).value)||"";
   S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey(),motivo:mot});salvar();rCaderno()}
-function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;salvar();rCadernoLista()}
+function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;salvar();
+  if(document.getElementById("cad-lista"))rCadernoLista(); else rCards();}
 function setMotivoFiltro(k){fMotivo=(fMotivo===k?"":k);rCaderno()}
 function resumoMotivosHTML(){
   const es=S.erros||[]; if(!es.length) return "";
