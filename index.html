@@ -4852,10 +4852,12 @@ function frenteDoErro(e){
 function garantirCardsDosErros(){
   if(!S||!S.erros)return 0;
   var criados=0,mudou=false;
-  // REGRA DELA: o app NUNCA reescreve um cartão que já existe. Só cria o que falta.
+  // REGRA DELA: o app NUNCA reescreve um cartão que já existe, e NUNCA inventa texto.
+  // Sem tema escrito não há como montar frente e verso distintos — então não cria nada
+  // (antes eu repetia o mesmo texto dos dois lados, o que não servia para estudar).
   S.erros.forEach(function(e){
     if(cardDoErro(e))return;
-    var frente=frenteDoErro(e); if(!frente&&!e.d)return;
+    var frente=String(e.t||"").trim(); if(!frente)return;
     var antigo=(S.cards||[]).find(function(c){
       if(c.src)return false;
       var f=String(c.f||"").trim();
@@ -5247,7 +5249,6 @@ function rCards(){
     const nErros=(S.erros||[]).length;
     const motSel=(fLei.indexOf("__mot_")===0)?fLei.slice(6):"";
     const modoErros=(fMat==="__erros")||!!motSel;
-    if(modoErros) garantirCardsDosErros();   // todo erro aparece já como flashcard, pronto para ver/corrigir
     const errosFiltrados=!modoErros?[]:(S.erros||[])
       .filter(e=>!motSel||(motSel==="sem"?!e.motivo:e.motivo===motSel))
       .filter(e=>!fBusca||((e.t||"")+" "+(e.d||"")+" "+((MAT[e.m]||MAT.R).n)+" "+((MOTIVOS[e.motivo]||{}).n||"")).toLowerCase().includes(fBusca))
@@ -6430,7 +6431,6 @@ function rCadernoLista(){
 function addErro(){const t=document.getElementById("erro-t").value.trim(),d=document.getElementById("erro-d").value.trim();
   if(!t&&!d)return;const mot=((document.getElementById("erro-motivo")||{}).value)||"";
   S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey(),motivo:mot});
-  garantirCardsDosErros();   // o erro já nasce como flashcard
   salvar();rCaderno();rTopo()}
 function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;
   // o flashcard já criado NÃO é alterado — o app não mexe em cartão que já existe
