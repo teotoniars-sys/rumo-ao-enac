@@ -5265,7 +5265,9 @@ function rCards(){
       <input type="text" id="idx-busca" placeholder="🔍 Buscar tema ou palavra..." value="${esc(fBusca)}" oninput="rCards()" style="margin-top:8px">
       ${modoErros
         ?`<p class="mut" style="margin:8px 0 4px">📕 <b>${errosFiltrados.length} erro(s)</b> do seu Caderno${motSel?" · motivo: <b>"+(motSel==="sem"?"sem classificação":MOTIVOS[motSel].n)+"</b>":""}${fBusca?" · busca":""}.</p>
-      <div class="dois-botoes" style="margin:2px 0 8px"><button class="acao sec mini" onclick="limparFiltroErros()">↩ voltar aos flashcards</button></div>`
+      <div class="dois-botoes" style="margin:2px 0 8px"><button class="acao sec mini" onclick="exportarIndice('print')">🖨️ Imprimir / PDF</button>
+      <button class="acao sec mini" onclick="exportarIndice('download')">⬇️ Baixar</button>
+      <button class="acao sec mini" onclick="limparFiltroErros()">↩ voltar aos flashcards</button></div>`
         :`<p class="mut" style="margin:8px 0 4px">${lista.length} cartão(ões)${fMat||fLei||fBusca?" no filtro":""}.</p>
       <div class="dois-botoes" style="margin:2px 0 8px"><button class="acao" ${lista.length?"":"disabled style='opacity:.5'"} onclick="treinarFiltrados()">▶ Treinar os ${lista.length} filtrados</button>
       <button class="acao sec mini" onclick="exportarIndice('print')">🖨️ Imprimir / PDF</button>
@@ -5702,10 +5704,31 @@ function listaErrosHTML(es,motSel){
     return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} ${acao}</div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${etiq}${classificar}</div>`;
   }).join("");
 }
+/* Impressão do Caderno de erros a partir do índice — agrupada por motivo do erro */
+function cadernoErrosDocHTML(motSel,fBusca){
+  const es=(S.erros||[])
+    .filter(e=>!motSel||(motSel==="sem"?!e.motivo:e.motivo===motSel))
+    .filter(e=>!fBusca||((e.t||"")+" "+(e.d||"")+" "+((MAT[e.m]||MAT.R).n)+" "+((MOTIVOS[e.motivo]||{}).n||"")).toLowerCase().includes(fBusca));
+  const grupos={};es.forEach(e=>{const k=e.motivo||"sem";(grupos[k]=grupos[k]||[]).push(e);});
+  const ordem=Object.keys(MOTIVOS).concat("sem").filter(k=>grupos[k]);
+  const dt=new Date().toLocaleDateString("pt-BR");
+  const rot=motSel?(motSel==="sem"?"sem classificação":(MOTIVOS[motSel]||{}).n):"";
+  let body=`<h1>Rumo ao ENAC — Caderno de erros</h1><p class="sub">${es.length} registro(s)${rot?" · motivo: "+esc(rot):""}${fBusca?' · busca: "'+esc(fBusca)+'"':""} · gerado em ${dt}</p>`;
+  ordem.forEach(k=>{const M=MOTIVOS[k]||{n:"Sem classificação",c:"#94a3b8",e:"❔"};
+    body+=`<h2 style="color:${M.c};border-color:${M.c}">${M.e} ${esc(M.n)} — ${grupos[k].length} erro(s)</h2>`;
+    grupos[k].forEach((e,i)=>{body+=`<div class="q" style="border-left-color:${M.c}"><div class="meta">${i+1} · ${esc((MAT[e.m]||MAT.R).n)}${e.lei?' · <b style="color:'+M.c+'">'+esc(e.lei)+'</b>':""} · ${fmtBr(e.k)}</div>${e.t?'<p class="f">'+destaque(esc(e.t))+'</p>':""}<p class="v"><span class="lbl">O que errei</span> ${destaque(esc(e.d||""))}</p></div>`;});
+  });
+  if(!es.length) body+=`<p>Nenhum erro no filtro atual.</p>`;
+  const css=`<style>body{font-family:'Segoe UI',Arial,sans-serif;color:#26313a;max-width:820px;margin:22px auto;padding:0 18px;line-height:1.6}h1{font-size:22px;color:#1f5c3b;margin-bottom:2px}.sub{color:#666;font-size:13px;margin-top:0}h2{font-size:16px;border-bottom:2px solid #ccc;margin:24px 0 10px;padding-bottom:4px}.q{margin:9px 0;padding:11px 14px;border:1px solid #e6ece8;border-left:5px solid #ccc;border-radius:10px;background:#fbfdfb;page-break-inside:avoid}.q .meta{font-size:11.5px;color:#6b7784;font-weight:700;margin-bottom:5px}.f{font-weight:700;margin:0;color:#1c2a22;font-size:15px;line-height:1.5}.v{margin:7px 0 0;color:#33413a;font-size:14px;white-space:pre-wrap;border-top:1px dashed #d6e0da;padding-top:7px;line-height:1.55}.v .lbl{display:inline-block;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#fff;background:#9aa7b3;border-radius:5px;padding:1px 7px;margin-right:5px;font-weight:800}mark{background:#fff3a0;padding:0 3px;border-radius:3px}@media print{@page{margin:12mm}.q{break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>`;
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Caderno de erros — Rumo ao ENAC (${dt})</title>${css}</head><body>${body}</body></html>`;
+}
 function indiceDocHTML(){
   const fMat=(document.getElementById("idx-mat")||{}).value||"";
   const fLei=(document.getElementById("idx-lei")||{}).value||"";
   const fBusca=((document.getElementById("idx-busca")||{}).value||"").toLowerCase();
+  // Caderno de erros: imprime os registros do Caderno, agrupados por motivo
+  const _mot=(fLei.indexOf("__mot_")===0)?fLei.slice(6):"";
+  if(fMat==="__erros"||_mot) return cadernoErrosDocHTML(_mot,fBusca);
   const lista=S.cards.filter(c=>(!fMat||c.m===fMat)&&(!fLei||c.lei===fLei)&&(!fBusca||((c.f||"")+" "+(c.b||"")).toLowerCase().includes(fBusca)));
   const grupos={};lista.forEach(c=>{(grupos[c.m]=grupos[c.m]||[]).push(c)});
   const areas=Object.keys(grupos).sort((a,b)=>(MAT[a]||MAT.R).n<(MAT[b]||MAT.R).n?-1:1);
@@ -5724,7 +5747,9 @@ function exportarIndice(modo){
   if(modo==="download"){
     const blob=new Blob([doc],{type:"text/html;charset=utf-8"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-    a.download="indice-flashcards-enac-"+hojeKey()+".html";a.click();
+    const _fm=(document.getElementById("idx-mat")||{}).value||"", _fl=(document.getElementById("idx-lei")||{}).value||"";
+    const _erros=(_fm==="__erros")||(_fl.indexOf("__mot_")===0);
+    a.download=(_erros?"caderno-de-erros-":"indice-flashcards-enac-")+hojeKey()+".html";a.click();
     return;
   }
   const w=window.open("","_blank");
