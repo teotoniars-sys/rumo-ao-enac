@@ -4841,16 +4841,26 @@ function tagMotivo(k){const M=MOTIVOS[k];return M?`<span class="tag" style="back
 /* etiqueta do flashcard gerado a partir de um erro: "Lei 9.492/97 — Caí na pegadinha" */
 function rotuloErro(e){const p=[e.lei,(MOTIVOS[e.motivo]||{}).n].filter(Boolean);return p.length?p.join(" — "):"📕 Caderno de erros";}
 function cardDoErro(e){const src="erro:"+e.id;return (S.cards||[]).find(function(c){return c.src===src;})||null;}
+/* NUNCA alterar o que ela escreveu: o tema vai tal e qual; sem tema, vai o texto inteiro.
+   Nada de cortar, resumir ou acrescentar prefixo — isso mudava o sentido do que ela redigiu. */
 function frenteDoErro(e){
-  var t=String(e.t||"").trim(); if(t)return t;
-  var d=String(e.d||"").replace(/\s+/g," ").trim();
-  return d.length>90?d.slice(0,90).replace(/\s+\S*$/,"")+"…":d;
+  var t=String(e.t||"").trim();
+  return t||String(e.d||"");
 }
 /* Todo erro TEM de ter o seu flashcard. Aditivo: adota o cartão que a versão antiga
    criou solto (sem src) em vez de duplicar, e só cria quando não existe nenhum. */
 function garantirCardsDosErros(){
   if(!S||!S.erros)return 0;
   var criados=0,mudou=false;
+  // conserta os cartões que uma versão anterior gerou com o texto CORTADO ("…"):
+  // devolve exatamente o que ela escreveu, sem tocar nos que ela já editou à mão.
+  S.erros.forEach(function(e){
+    var c=cardDoErro(e); if(!c)return;
+    var f=String(c.f||"");
+    if(f.slice(-1)!=="…")return;
+    var inteiro=frenteDoErro(e);
+    if(inteiro && inteiro.replace(/\s+/g," ").indexOf(f.slice(0,-1).replace(/\s+/g," ").trim())===0){ c.f=inteiro; mudou=true; }
+  });
   S.erros.forEach(function(e){
     if(cardDoErro(e))return;
     var frente=frenteDoErro(e); if(!frente&&!e.d)return;
@@ -6488,7 +6498,7 @@ function exportarCaderno(modo,tipo){
 function erroParaCard(id){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;
   const ja=cardDoErro(e);
   if(ja){ alert("Este erro já tem flashcard. Use \"ver / editar o flashcard\" para corrigi-lo."); return; }
-  S.cards.push({id:"e"+e.id,src:"erro:"+e.id,m:e.m||"N",lei:rotuloErro(e),f:e.t||"",b:e.d||"",ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
+  S.cards.push({id:"e"+e.id,src:"erro:"+e.id,m:e.m||"N",lei:rotuloErro(e),f:frenteDoErro(e),b:e.d||"",ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
   garantirNumeros();
   salvar();rTopo();
   alert("Flashcard criado! Ele já entrou na fila de revisão de hoje.")}
