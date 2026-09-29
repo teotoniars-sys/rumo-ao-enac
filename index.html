@@ -5190,8 +5190,8 @@ function rCards(){
       <div class="grid2" style="margin-top:8px">
         <div><label class="mut">Área do Direito</label><select id="novo-m" onchange="novoModoErro()" ${fixarAL?"disabled":""}>${Object.keys(MAT).map(m=>`<option value="${m}"${manualM===m?" selected":""}>${MAT[m].n}</option>`).join("")}<option value="__erros">📕 Caderno de erros</option></select></div>
         <div id="wrap-lei"><label class="mut">Lei / tema (STF ou STJ)</label><input type="text" id="novo-lei" list="novo-lei-dl" value="${esc(manualLei)}" ${fixarAL?"disabled":""} placeholder="ex.: Lei 6.015/73 · STF Tema 809 · Súmula 377"></div>
-        <div id="wrap-motivo" hidden><label class="mut">Por que errei</label><select id="novo-motivo">${Object.keys(MOTIVOS).map(k=>`<option value="${k}">${MOTIVOS[k].e} ${MOTIVOS[k].n} — ${MOTIVOS[k].d}</option>`).join("")}</select></div></div>
-      <div id="wrap-erro-area" hidden style="margin-top:8px"><label class="mut">Matéria do erro (entra no diagnóstico por área)</label><select id="novo-erro-m">${Object.keys(MAT).map(m=>`<option value="${m}"${manualM===m?" selected":""}>${MAT[m].n}</option>`).join("")}</select></div>
+        <div id="wrap-erro-lei" hidden><label class="mut">Lei que errei</label><input type="text" id="novo-erro-lei" placeholder="ex.: Lei 9.492/97"></div></div>
+      <div id="wrap-motivo" hidden style="margin-top:8px"><label class="mut">Por que errei</label><select id="novo-motivo">${Object.keys(MOTIVOS).map(k=>`<option value="${k}">${MOTIVOS[k].e} ${MOTIVOS[k].n} — ${MOTIVOS[k].d}</option>`).join("")}</select></div>
       <datalist id="novo-lei-dl">${leisDl.map(function(l){return '<option value="'+esc(l)+'">';}).join("")}</datalist>
       <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.9rem;cursor:pointer"><input type="checkbox" ${fixarAL?"checked":""} onchange="toggleFixar(this.checked)" style="width:18px;height:18px"> 🔒 <b>Fixar esta área e lei</b> (lançar vários seguidos sem risco de trocar)</label>
       ${fixarAL?`<div class="ex" style="border:1.5px solid var(--verde);background:rgba(46,125,82,.12);color:var(--verde-esc);font-weight:700;margin-top:6px">🔒 Fixado: ${MAT[manualM]?MAT[manualM].n:manualM}${manualLei?" · "+esc(manualLei):""} — todos os novos cards vão para cá.</div>`:""}
@@ -5533,11 +5533,11 @@ function toggleFixar(on){
 function novoModoErro(){
   var erro=((document.getElementById("novo-m")||{}).value==="__erros");
   var mostra=function(id,on){var e=document.getElementById(id);if(e)e.hidden=!on;};
-  mostra("wrap-lei",!erro); mostra("wrap-motivo",erro); mostra("wrap-erro-area",erro);
+  mostra("wrap-lei",!erro); mostra("wrap-erro-lei",erro); mostra("wrap-motivo",erro);
   var f=document.getElementById("novo-f"),b=document.getElementById("novo-b"),bt=document.getElementById("btn-criar");
   if(f)f.placeholder=erro?"Tema do erro (ex.: prazo do protesto)":"Frente (pergunta / caso prático)";
   if(b)b.placeholder=erro?"O que errei e qual a lição":"Verso (resposta + fundamento + pegadinha)";
-  if(bt)bt.textContent=erro?"Registrar no Caderno de Erros":"Adicionar card";
+  if(bt)bt.textContent=erro?"Registrar erro e criar flashcard":"Adicionar card";
 }
 function criarCard(){
   const f=document.getElementById("novo-f").value.trim(),b=document.getElementById("novo-b").value.trim();
@@ -5546,12 +5546,23 @@ function criarCard(){
     if(!f&&!b)return;
     S.erros=S.erros||[];
     var mot=((document.getElementById("novo-motivo")||{}).value)||"";
-    var mErr=((document.getElementById("novo-erro-m")||{}).value)||manualM||"N";
-    S.erros.push({id:Date.now(),m:mErr,t:f,d:b,k:hojeKey(),motivo:mot});
+    var leiErr=(((document.getElementById("novo-erro-lei")||{}).value)||"").trim();
+    var mErr=manualM||"N";
+    // etiqueta única, no formato "Lei 9.492/97 — Caí na pegadinha"
+    var rot=[leiErr,((MOTIVOS[mot]||{}).n||"")].filter(Boolean).join(" — ");
+    var eid=Date.now();
+    S.erros.push({id:eid,m:mErr,t:f,d:b,k:hojeKey(),motivo:mot,lei:leiErr});
+    // o erro também vira flashcard, com a lei + o motivo na etiqueta
+    var src="erro:"+eid;
+    if(!(S.cards||[]).some(function(c){return c.src===src;})){
+      S.cards.push({id:"e"+eid,src:src,m:mErr,lei:rot,f:f,b:b,ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
+      garantirNumeros();
+    }
     document.getElementById("novo-f").value="";document.getElementById("novo-b").value="";
-    criouMsg="✅ Erro registrado no Caderno · "+(MAT[mErr]||MAT.R).n+" · "+((MOTIVOS[mot]||{}).n||"sem classificação")+". Pode registrar o próximo.";
+    criouMsg="✅ Erro registrado no Caderno e já virou flashcard"+(rot?" · "+esc(rot):"")+". Pode registrar o próximo.";
     salvar();rCards();rTopo();
     var s=document.getElementById("novo-m");if(s){s.value="__erros";novoModoErro();}   // continua no modo erro
+    var le=document.getElementById("novo-erro-lei");if(le)le.value=leiErr;             // mantém a lei para o próximo
     return;
   }
   if(!f||!b)return;
@@ -5630,7 +5641,7 @@ function listaErrosHTML(es,motSel){
   if(!es.length) return `<p class="mut" style="font-style:italic">Nenhum erro${motSel?" com esse motivo":""} registrado ainda. Você registra na aba <b>Caderno</b>.</p>`;
   return es.map(function(e){
     var classificar=e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(function(k){return `<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`;}).join("")}</div>`;
-    return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} · ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ virar flashcard</a></div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${classificar}</div>`;
+    return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ virar flashcard</a></div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${classificar}</div>`;
   }).join("");
 }
 function indiceDocHTML(){
@@ -6351,7 +6362,7 @@ function rCadernoLista(){
   const erros=S.erros.filter(e=>casaMotivo(e)).filter(e=>!busca||(e.t+" "+e.d+" "+(MAT[e.m]||MAT.R).n+" "+((MOTIVOS[e.motivo]||{}).n||"")).toLowerCase().includes(busca));
   const notas=(fMotivo?[]:S.notas).filter(n=>!busca||(n.d+" "+(n.m?MAT[n.m].n:"")).toLowerCase().includes(busca));
   const classificarHTML=e=>e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(k=>`<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`).join("")}</div>`;
-  let html=erros.slice().reverse().map(e=>`<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} · ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});return false">➜ virar flashcard</a> <a href="#" style="color:#c05336" onclick="delErro(${e.id});return false">apagar</a></div><b>${esc(e.t)}</b><br>${linkJuris(esc(e.d))}${classificarHTML(e)}</div>`).join("");
+  let html=erros.slice().reverse().map(e=>`<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});return false">➜ virar flashcard</a> <a href="#" style="color:#c05336" onclick="delErro(${e.id});return false">apagar</a></div><b>${esc(e.t)}</b><br>${linkJuris(esc(e.d))}${classificarHTML(e)}</div>`).join("");
   html+=notas.slice().reverse().map(n=>`<div class="item-cad"><div class="meta">📝 NOTA · ${n.m?tag(n.m)+" · ":""}${fmtBr(n.k)} <a href="#" style="margin-left:auto;color:#c05336" onclick="delNota(${n.id});return false">apagar</a></div>${linkJuris(esc(n.d))}</div>`).join("");
   li.innerHTML=html||'<p class="mut">Nada registrado ainda. Errou uma questão? Registre aqui — é o hábito que mais aprova.</p>';
 }
