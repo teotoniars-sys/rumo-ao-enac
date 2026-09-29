@@ -5694,9 +5694,10 @@ function listaErrosHTML(es,motSel){
   return es.map(function(e){
     var classificar=e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(function(k){return `<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`;}).join("")}</div>`;
     var c=cardDoErro(e);
-    var acao=c
+    var acao=(c
       ? `<a href="#" style="margin-left:auto;font-weight:600" onclick="editarFlashcardDoErro('${c.id}');return false">✏️ ver / corrigir o flashcard</a>`
-      : `<a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ criar o flashcard</a>`;
+      : `<a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ criar o flashcard</a>`)
+      + ` <a href="#" style="color:#c05336" onclick="apagarErroCompleto(${e.id});return false">apagar tudo</a>`;
     var etiq=c?`<div style="margin-top:6px;padding:6px 8px;background:rgba(46,125,82,.07);border-radius:8px"><span class="mut" style="font-size:.8rem">🃏 já é flashcard Nº ${c.n||"—"} ·</span> <b style="color:var(--verde-esc)">${esc(c.lei||"—")}</b> <span class="mut" style="font-size:.8rem">· revisão ${fmtBr(c.due)}</span><br><span class="mut" style="font-size:.8rem">frente:</span> ${esc(String(c.f||"").slice(0,120))}${String(c.f||"").length>120?"…":""}</div>`:"";
     return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} ${acao}</div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${etiq}${classificar}</div>`;
   }).join("");
@@ -6511,6 +6512,15 @@ function erroParaCard(id){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;
   garantirNumeros();
   salvar();rTopo();
   alert("Flashcard criado! Ele já entrou na fila de revisão de hoje.")}
+/* apaga o registro do Caderno E o flashcard ligado a ele, de uma vez */
+function apagarErroCompleto(id){
+  var e=(S.erros||[]).find(function(x){return x.id===id;}); if(!e)return;
+  var c=cardDoErro(e);
+  if(!confirm("Apagar este registro do Caderno de Erros"+(c?" e o flashcard Nº "+(c.n||"?")+" ligado a ele":"")+"?\n\nSó dá para voltar restaurando uma versão guardada (Ajustes)."))return;
+  if(c) S.cards=(S.cards||[]).filter(function(x){return x.id!==c.id;});
+  S.erros=(S.erros||[]).filter(function(x){return x.id!==id;});
+  salvar(); rTopo(); rCards();
+}
 /* abre o flashcard do erro no editor do índice (sai do filtro de erros para o editor aparecer) */
 function editarFlashcardDoErro(cardId){const a=document.getElementById("idx-mat"),b=document.getElementById("idx-lei");
   if(a)a.value="";if(b)b.value="";editarIdx(cardId);}
