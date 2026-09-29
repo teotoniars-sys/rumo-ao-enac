@@ -4841,6 +4841,31 @@ function tagMotivo(k){const M=MOTIVOS[k];return M?`<span class="tag" style="back
 /* etiqueta do flashcard gerado a partir de um erro: "Lei 9.492/97 — Caí na pegadinha" */
 function rotuloErro(e){const p=[e.lei,(MOTIVOS[e.motivo]||{}).n].filter(Boolean);return p.length?p.join(" — "):"📕 Caderno de erros";}
 function cardDoErro(e){const src="erro:"+e.id;return (S.cards||[]).find(function(c){return c.src===src;})||null;}
+function frenteDoErro(e){
+  var t=String(e.t||"").trim(); if(t)return t;
+  var d=String(e.d||"").replace(/\s+/g," ").trim();
+  return d.length>90?d.slice(0,90).replace(/\s+\S*$/,"")+"…":d;
+}
+/* Todo erro TEM de ter o seu flashcard. Aditivo: adota o cartão que a versão antiga
+   criou solto (sem src) em vez de duplicar, e só cria quando não existe nenhum. */
+function garantirCardsDosErros(){
+  if(!S||!S.erros)return 0;
+  var criados=0,mudou=false;
+  S.erros.forEach(function(e){
+    if(cardDoErro(e))return;
+    var frente=frenteDoErro(e); if(!frente&&!e.d)return;
+    var antigo=(S.cards||[]).find(function(c){
+      if(c.src)return false;
+      var f=String(c.f||"").trim();
+      return f==="⚠️ (do seu Caderno de Erros) "+String(e.t||"").trim() || (frente&&f===frente);
+    });
+    if(antigo){ antigo.src="erro:"+e.id; if(!antigo.lei)antigo.lei=rotuloErro(e); mudou=true; return; }
+    S.cards.push({id:"e"+e.id,src:"erro:"+e.id,m:e.m||"N",lei:rotuloErro(e),f:frente,b:e.d||"",ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
+    criados++;mudou=true;
+  });
+  if(mudou){ garantirNumeros(); salvar(); }
+  return criados;
+}
 /* ============ TOPO (chips) ============ */
 function rTopo(){
   const h=hojeKey();
@@ -5167,7 +5192,10 @@ function rCards(){
         <option value="caso">Caso prático (estilo FGV)</option>
         <option value="lei">Lei seca (memorizar dispositivos)</option>
         <option value="juris">Jurisprudência (teses)</option></select>
-      <select id="ia-mat">${Object.keys(MAT).map(m=>`<option value="${m}">${MAT[m].n}</option>`).join("")}</select></div>
+      <select id="ia-mat" onchange="iaModoErro()">${Object.keys(MAT).map(m=>`<option value="${m}">${MAT[m].n}</option>`).join("")}<option value="__erros">📕 Caderno de erros</option></select></div>
+      <div id="ia-wrap-erro" hidden class="grid2" style="margin-top:8px">
+        <div><label class="mut">Lei que errei</label><input type="text" id="ia-erro-lei" placeholder="ex.: Lei 9.492/97"></div>
+        <div><label class="mut">Por que errei</label><select id="ia-erro-motivo">${Object.keys(MOTIVOS).map(k=>`<option value="${k}">${MOTIVOS[k].e} ${MOTIVOS[k].n} — ${MOTIVOS[k].d}</option>`).join("")}</select></div></div>
       <textarea id="ia-cola" style="margin-top:8px;min-height:110px" placeholder="Cole aqui o texto ou a imagem (Ctrl+V)..." onpaste="capturarCola(event)"></textarea>
       <div id="ia-thumbs" class="thumbs"></div>
       <div class="dois-botoes"><button class="acao" onclick="gerarCardsIA()">Gerar flashcards ✨</button>
@@ -5217,6 +5245,7 @@ function rCards(){
     const nErros=(S.erros||[]).length;
     const motSel=(fLei.indexOf("__mot_")===0)?fLei.slice(6):"";
     const modoErros=(fMat==="__erros")||!!motSel;
+    if(modoErros) garantirCardsDosErros();   // todo erro aparece já como flashcard, pronto para ver/corrigir
     const errosFiltrados=!modoErros?[]:(S.erros||[])
       .filter(e=>!motSel||(motSel==="sem"?!e.motivo:e.motivo===motSel))
       .filter(e=>!fBusca||((e.t||"")+" "+(e.d||"")+" "+((MAT[e.m]||MAT.R).n)+" "+((MOTIVOS[e.motivo]||{}).n||"")).toLowerCase().includes(fBusca))
@@ -5646,9 +5675,9 @@ function listaErrosHTML(es,motSel){
     var classificar=e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(function(k){return `<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`;}).join("")}</div>`;
     var c=cardDoErro(e);
     var acao=c
-      ? `<a href="#" style="margin-left:auto;font-weight:600" onclick="editarFlashcardDoErro('${c.id}');return false">✏️ ver / editar o flashcard</a>`
-      : `<a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ virar flashcard</a>`;
-    var etiq=c?`<div style="margin-top:6px"><span class="mut" style="font-size:.8rem">flashcard Nº ${c.n||"—"} · etiqueta:</span> <b style="color:var(--verde-esc)">${esc(c.lei||"—")}</b> <span class="mut" style="font-size:.8rem">· revisão ${fmtBr(c.due)}</span></div>`:"";
+      ? `<a href="#" style="margin-left:auto;font-weight:600" onclick="editarFlashcardDoErro('${c.id}');return false">✏️ ver / corrigir o flashcard</a>`
+      : `<a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ criar o flashcard</a>`;
+    var etiq=c?`<div style="margin-top:6px;padding:6px 8px;background:rgba(46,125,82,.07);border-radius:8px"><span class="mut" style="font-size:.8rem">🃏 já é flashcard Nº ${c.n||"—"} ·</span> <b style="color:var(--verde-esc)">${esc(c.lei||"—")}</b> <span class="mut" style="font-size:.8rem">· revisão ${fmtBr(c.due)}</span><br><span class="mut" style="font-size:.8rem">frente:</span> ${esc(String(c.f||"").slice(0,120))}${String(c.f||"").length>120?"…":""}</div>`:"";
     return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} ${acao}</div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${etiq}${classificar}</div>`;
   }).join("");
 }
@@ -5706,10 +5735,19 @@ const INSTR_TIPO={
  juris:`Formato JURISPRUDÊNCIA: FRENTE = situação concreta curta que envolve a tese. VERSO = a tese firmada + identificação precisa do precedente (Tema de repercussão geral / Súmula / ADI + tribunal) + "Pegadinha:" como a FGV distorce a tese.`,
  auto:`Detecte o tipo de conteúdo (lei seca, jurisprudência, doutrina ou caso) e use o formato de card mais adequado — sempre com pergunta objetiva na FRENTE e, no VERSO, resposta + fundamento legal/precedente + "Pegadinha:" da FGV.`
 };
+/* mesma lógica do formulário manual: "Caderno de erros" mostra lei + motivo */
+function iaModoErro(){
+  var erro=((document.getElementById("ia-mat")||{}).value==="__erros");
+  var w=document.getElementById("ia-wrap-erro"); if(w)w.hidden=!erro;
+  var bt=[].slice.call(document.querySelectorAll("[onclick='gerarCardsIA()']"))[0];
+  if(bt)bt.textContent=erro?"Gerar e registrar no Caderno ✨":"Gerar flashcards ✨";
+}
 async function gerarCardsIA(){
   const texto=(document.getElementById("ia-cola").value||"").trim();
   if(!texto&&!colaImgs.length)return;
-  const m=document.getElementById("ia-mat").value;
+  const sel=document.getElementById("ia-mat").value;
+  const modoErro=(sel==="__erros");
+  const m=modoErro?(manualM||"N"):sel;   // a IA precisa de uma matéria de verdade no prompt
   const tipo=document.getElementById("ia-tipo").value;
   const st=document.getElementById("ia-status");
   st.innerHTML='<div class="resposta-ia"><span class="spin"></span> Lendo o material e criando os flashcards...</div>';
@@ -5723,16 +5761,29 @@ Responda APENAS com JSON válido, sem markdown: [{"frente":"...","verso":"..."}]
 ${texto?"MATERIAL:\n"+texto.slice(0,15000):""}`,colaImgs);
     const limpo=txt.replace(/```json|```/g,"").trim();
     const arr=JSON.parse(limpo.slice(limpo.indexOf("["),limpo.lastIndexOf("]")+1));
-    iaPreview=arr.filter(c=>c&&(c.frente||c.verso)).map(c=>({m:m,f:c.frente||"",b:c.verso||""}));
+    const leiErr=modoErro?(((document.getElementById("ia-erro-lei")||{}).value)||"").trim():"";
+    const motErr=modoErro?(((document.getElementById("ia-erro-motivo")||{}).value)||""):"";
+    iaPreview=arr.filter(c=>c&&(c.frente||c.verso)).map(c=>({m:m,f:c.frente||"",b:c.verso||"",erro:modoErro,lei:leiErr,motivo:motErr}));
     limparCola();rCards();
   }catch(e){st.innerHTML='<div class="resposta-ia">⚠️ '+esc(e.message)+'</div>'}
 }
 function salvarIaPreview(){
   if(!iaPreview){rCards();return}
   let n=0;
-  iaPreview.forEach((c,i)=>{const f=(c.f||"").trim(),b=(c.b||"").trim();if(f&&b){S.cards.push({id:"ia"+Date.now()+"_"+i,m:c.m||"N",f:f,b:b,ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});n++;}});
+  let nErr=0;
+  iaPreview.forEach((c,i)=>{const f=(c.f||"").trim(),b=(c.b||"").trim();if(!f||!b)return;
+    if(c.erro){                       // vai para o Caderno de Erros E vira flashcard, como no formulário manual
+      S.erros=S.erros||[];
+      const eid=Date.now()+i;
+      const novoErro={id:eid,m:c.m||"N",t:f,d:b,k:hojeKey(),motivo:c.motivo||"",lei:c.lei||""};
+      S.erros.push(novoErro);
+      S.cards.push({id:"e"+eid,src:"erro:"+eid,m:c.m||"N",lei:rotuloErro(novoErro),f:f,b:b,ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
+      n++;nErr++;return;
+    }
+    S.cards.push({id:"ia"+Date.now()+"_"+i,m:c.m||"N",f:f,b:b,ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});n++;});
+  garantirNumeros();
   iaPreview=null;salvar();rCards();rTopo();
-  const st=document.getElementById("ia-status");if(st)st.innerHTML='<div class="resposta-ia">✅ '+n+' flashcard(s) salvos no baralho! Já estão na fila de revisão e no índice.</div>';
+  const st=document.getElementById("ia-status");if(st)st.innerHTML='<div class="resposta-ia">✅ '+n+' flashcard(s) salvos no baralho!'+(nErr?' '+nErr+' também entraram no Caderno de Erros.':'')+' Já estão na fila de revisão e no índice.</div>';
 }
 function descartarIaCard(i){if(!iaPreview)return;iaPreview.splice(i,1);if(!iaPreview.length)iaPreview=null;rCards();}
 function cancelarIaPreview(){iaPreview=null;rCards();}
@@ -6376,7 +6427,9 @@ function rCadernoLista(){
 }
 function addErro(){const t=document.getElementById("erro-t").value.trim(),d=document.getElementById("erro-d").value.trim();
   if(!t&&!d)return;const mot=((document.getElementById("erro-motivo")||{}).value)||"";
-  S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey(),motivo:mot});salvar();rCaderno()}
+  S.erros.push({id:Date.now(),m:document.getElementById("erro-m").value,t,d,k:hojeKey(),motivo:mot});
+  garantirCardsDosErros();   // o erro já nasce como flashcard
+  salvar();rCaderno();rTopo()}
 function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;
   const c=cardDoErro(e); if(c)c.lei=rotuloErro(e);   // mantém a etiqueta do flashcard em dia
   salvar();rTopo();
