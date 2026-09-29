@@ -4852,15 +4852,7 @@ function frenteDoErro(e){
 function garantirCardsDosErros(){
   if(!S||!S.erros)return 0;
   var criados=0,mudou=false;
-  // conserta os cartões que uma versão anterior gerou com o texto CORTADO ("…"):
-  // devolve exatamente o que ela escreveu, sem tocar nos que ela já editou à mão.
-  S.erros.forEach(function(e){
-    var c=cardDoErro(e); if(!c)return;
-    var f=String(c.f||"");
-    if(f.slice(-1)!=="…")return;
-    var inteiro=frenteDoErro(e);
-    if(inteiro && inteiro.replace(/\s+/g," ").indexOf(f.slice(0,-1).replace(/\s+/g," ").trim())===0){ c.f=inteiro; mudou=true; }
-  });
+  // REGRA DELA: o app NUNCA reescreve um cartão que já existe. Só cria o que falta.
   S.erros.forEach(function(e){
     if(cardDoErro(e))return;
     var frente=frenteDoErro(e); if(!frente&&!e.d)return;
@@ -4869,7 +4861,7 @@ function garantirCardsDosErros(){
       var f=String(c.f||"").trim();
       return f==="⚠️ (do seu Caderno de Erros) "+String(e.t||"").trim() || (frente&&f===frente);
     });
-    if(antigo){ antigo.src="erro:"+e.id; if(!antigo.lei)antigo.lei=rotuloErro(e); mudou=true; return; }
+    if(antigo){ antigo.src="erro:"+e.id; mudou=true; return; }   // só liga o cartão ao erro; não toca no conteúdo
     S.cards.push({id:"e"+e.id,src:"erro:"+e.id,m:e.m||"N",lei:rotuloErro(e),f:frente,b:e.d||"",ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
     criados++;mudou=true;
   });
@@ -6441,7 +6433,7 @@ function addErro(){const t=document.getElementById("erro-t").value.trim(),d=docu
   garantirCardsDosErros();   // o erro já nasce como flashcard
   salvar();rCaderno();rTopo()}
 function classificarErro(id,motivo){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;e.motivo=motivo;
-  const c=cardDoErro(e); if(c)c.lei=rotuloErro(e);   // mantém a etiqueta do flashcard em dia
+  // o flashcard já criado NÃO é alterado — o app não mexe em cartão que já existe
   salvar();rTopo();
   if(document.getElementById("cad-lista"))rCadernoLista(); else rCards();}
 function setMotivoFiltro(k){fMotivo=(fMotivo===k?"":k);rCaderno()}
