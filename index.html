@@ -4838,6 +4838,9 @@ function imprimirRadiografia(soLei){
 }
 function tag(m){const M=MAT[m]||MAT.R;return `<span class="tag" style="background:${M.c}">${M.n}</span>`}
 function tagMotivo(k){const M=MOTIVOS[k];return M?`<span class="tag" style="background:${M.c}" title="${M.d}">${M.e} ${M.n}</span>`:`<span class="tag" style="background:#94a3b8" title="ainda não classificado">sem classificação</span>`}
+/* etiqueta do flashcard gerado a partir de um erro: "Lei 9.492/97 — Caí na pegadinha" */
+function rotuloErro(e){const p=[e.lei,(MOTIVOS[e.motivo]||{}).n].filter(Boolean);return p.length?p.join(" — "):"📕 Caderno de erros";}
+function cardDoErro(e){const src="erro:"+e.id;return (S.cards||[]).find(function(c){return c.src===src;})||null;}
 /* ============ TOPO (chips) ============ */
 function rTopo(){
   const h=hojeKey();
@@ -5548,10 +5551,10 @@ function criarCard(){
     var mot=((document.getElementById("novo-motivo")||{}).value)||"";
     var leiErr=(((document.getElementById("novo-erro-lei")||{}).value)||"").trim();
     var mErr=manualM||"N";
-    // etiqueta única, no formato "Lei 9.492/97 — Caí na pegadinha"
-    var rot=[leiErr,((MOTIVOS[mot]||{}).n||"")].filter(Boolean).join(" — ");
     var eid=Date.now();
-    S.erros.push({id:eid,m:mErr,t:f,d:b,k:hojeKey(),motivo:mot,lei:leiErr});
+    var novoErro={id:eid,m:mErr,t:f,d:b,k:hojeKey(),motivo:mot,lei:leiErr};
+    S.erros.push(novoErro);
+    var rot=rotuloErro(novoErro);   // "Lei 9.492/97 — Caí na pegadinha"
     // o erro também vira flashcard, com a lei + o motivo na etiqueta
     var src="erro:"+eid;
     if(!(S.cards||[]).some(function(c){return c.src===src;})){
@@ -5641,7 +5644,12 @@ function listaErrosHTML(es,motSel){
   if(!es.length) return `<p class="mut" style="font-style:italic">Nenhum erro${motSel?" com esse motivo":""} registrado ainda. Você registra na aba <b>Caderno</b>.</p>`;
   return es.map(function(e){
     var classificar=e.motivo?"":`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="mut" style="font-size:.8rem">classificar:</span>${Object.keys(MOTIVOS).map(function(k){return `<button class="acao mini" style="background:${MOTIVOS[k].c}" title="${MOTIVOS[k].d}" onclick="classificarErro(${e.id},'${k}')">${MOTIVOS[k].e} ${MOTIVOS[k].n}</button>`;}).join("")}</div>`;
-    return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} <a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ virar flashcard</a></div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${classificar}</div>`;
+    var c=cardDoErro(e);
+    var acao=c
+      ? `<a href="#" style="margin-left:auto;font-weight:600" onclick="editarFlashcardDoErro('${c.id}');return false">✏️ ver / editar o flashcard</a>`
+      : `<a href="#" style="margin-left:auto" onclick="erroParaCard(${e.id});rCards();return false">➜ virar flashcard</a>`;
+    var etiq=c?`<div style="margin-top:6px"><span class="mut" style="font-size:.8rem">flashcard Nº ${c.n||"—"} · etiqueta:</span> <b style="color:var(--verde-esc)">${esc(c.lei||"—")}</b> <span class="mut" style="font-size:.8rem">· revisão ${fmtBr(c.due)}</span></div>`:"";
+    return `<div class="item-cad"><div class="meta">❌ ERRO · ${tag(e.m)} ${e.lei?"· <b style='color:var(--verde-esc)'>"+esc(e.lei)+"</b> ":""}· ${tagMotivo(e.motivo)} · ${fmtBr(e.k)} ${acao}</div><b>${esc(e.t||"")}</b>${e.d?"<br>"+linkJuris(esc(e.d)):""}${etiq}${classificar}</div>`;
   }).join("");
 }
 function indiceDocHTML(){
@@ -6422,9 +6430,16 @@ function exportarCaderno(modo,tipo){
   w.document.open();w.document.write(doc);w.document.close();
   setTimeout(function(){try{w.focus();w.print();}catch(e){}},400);
 }
-function erroParaCard(id){const e=S.erros.find(x=>x.id===id);if(!e)return;
-  S.cards.push({id:"e"+Date.now(),m:e.m,f:"⚠️ (do seu Caderno de Erros) "+e.t,b:e.d,ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
-  salvar();alert("Flashcard criado! Ele já entrou na fila de revisão de hoje.")}
+function erroParaCard(id){const e=(S.erros||[]).find(x=>x.id===id);if(!e)return;
+  const ja=cardDoErro(e);
+  if(ja){ alert("Este erro já tem flashcard. Use \"ver / editar o flashcard\" para corrigi-lo."); return; }
+  S.cards.push({id:"e"+e.id,src:"erro:"+e.id,m:e.m||"N",lei:rotuloErro(e),f:e.t||"",b:e.d||"",ef:2.5,ivl:0,due:hojeKey(),reps:0,criado:hojeKey()});
+  garantirNumeros();
+  salvar();rTopo();
+  alert("Flashcard criado! Ele já entrou na fila de revisão de hoje.")}
+/* abre o flashcard do erro no editor do índice (sai do filtro de erros para o editor aparecer) */
+function editarFlashcardDoErro(cardId){const a=document.getElementById("idx-mat"),b=document.getElementById("idx-lei");
+  if(a)a.value="";if(b)b.value="";editarIdx(cardId);}
 /* ============ ABA PROGRESSO ============ */
 function rProg(){
   const el=document.getElementById("aba-prog");const h=hojeKey();
