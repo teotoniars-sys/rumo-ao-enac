@@ -5179,17 +5179,17 @@ function rCards(){
   }else{
     var areasCards=Array.from(new Set(S.cards.map(function(c){return c.m;}))).sort(function(a,b){return (MAT[a]?MAT[a].n:a).localeCompare(MAT[b]?MAT[b].n:b);});
     var leisCards=Array.from(new Set([].concat(S.cards.map(function(c){return c.lei;}),S.cards.map(function(c){return c.tema;})).filter(Boolean))).sort();
-    var vencF=venc.filter(function(c){return (!revMat||c.m===revMat)&&(!revLei||c.lei===revLei||c.tema===revLei);});
-    var todosF=S.cards.filter(function(c){return (!revMat||c.m===revMat)&&(!revLei||c.lei===revLei||c.tema===revLei);});
+    var vencF=venc.filter(casaFiltroRev);
+    var todosF=S.cards.filter(casaFiltroRev);
     html+=`<div style="border:1.5px solid var(--verde);border-radius:12px;padding:12px;margin-top:12px;background:rgba(46,125,82,.06)">
       <b style="color:var(--verde-esc)">▶ Revisar — escolha o que revisar</b>
       <div class="grid2" style="margin-top:8px">
-        <div><label class="mut">Área do Direito</label><select onchange="revMat=this.value;rCards()"><option value="">Todas as áreas</option>${areasCards.map(function(m){return '<option value="'+m+'"'+(revMat===m?' selected':'')+'>'+(MAT[m]?MAT[m].n:m)+'</option>';}).join("")}</select></div>
+        <div><label class="mut">Área do Direito</label><select onchange="revMat=this.value;rCards()"><option value="">Todas as áreas</option>${areasCards.map(function(m){return '<option value="'+m+'"'+(revMat===m?' selected':'')+'>'+(MAT[m]?MAT[m].n:m)+'</option>';}).join("")}<option value="__erros"${revMat==="__erros"?" selected":""}>📕 Caderno de erros (${S.cards.filter(function(c){return String(c.src||"").indexOf("erro:")===0;}).length})</option></select></div>
         <div><label class="mut">Lei / tema (STF ou STJ)</label><select onchange="revLei=this.value;rCards()"><option value="">Todas as leis / temas</option>${leisCards.map(function(l){return '<option value="'+esc(l)+'"'+(revLei===l?' selected':'')+'>'+esc(l)+'</option>';}).join("")}</select></div></div>
       <div class="dois-botoes" style="margin-top:8px">
         <button class="acao" ${vencF.length?"":"disabled style='opacity:.5'"} onclick="iniciarSessaoFiltrada()">Revisar vencidos (${vencF.length}) ▶</button>
         <button class="acao sec" ${todosF.length?"":"disabled style='opacity:.5'"} onclick="iniciarSessaoFiltrada(true)">Revisar todos, mesmo não vencidos (${todosF.length}) ▶</button></div>
-      ${(revMat||revLei)?`<p class="mut" style="margin-top:6px;font-size:.82rem">🎯 Revisando só: <b>${revMat?(MAT[revMat]?MAT[revMat].n:revMat):"todas as áreas"}</b>${revLei?" · <b>"+esc(revLei)+"</b>":""} — <b>${vencF.length}</b> vencido(s) · <b>${todosF.length}</b> no total.</p>`:`<p class="mut" style="margin-top:6px;font-size:.82rem">Deixe em "Todas" para revisar tudo, ou escolha uma área/lei para focar. Use "Revisar todos" para treinar mesmo os que ainda não venceram — a revisão espaçada continua normal depois.</p>`}</div></div>`;
+      ${(revMat||revLei)?`<p class="mut" style="margin-top:6px;font-size:.82rem">🎯 Revisando só: <b>${revMat==="__erros"?"📕 Caderno de erros":(revMat?(MAT[revMat]?MAT[revMat].n:revMat):"todas as áreas")}</b>${revLei?" · <b>"+esc(revLei)+"</b>":""} — <b>${vencF.length}</b> vencido(s) · <b>${todosF.length}</b> no total.</p>`:`<p class="mut" style="margin-top:6px;font-size:.82rem">Deixe em "Todas" para revisar tudo, ou escolha uma área/lei para focar. Use "Revisar todos" para treinar mesmo os que ainda não venceram — a revisão espaçada continua normal depois.</p>`}</div></div>`;
     html+=`<div class="card"><h2>✨ Flashcards por IA — cole e pronto</h2>
       <p class="mut" style="margin-bottom:8px">Cole no campo abaixo <b>qualquer material</b> — artigo de lei seca, julgado/jurisprudência, trecho de doutrina, questão comentada — ou uma <b>imagem</b> (print ou foto: Ctrl+V direto no campo). A IA transforma em flashcards no estilo da FGV. Também funciona digitando só um tema (ex.: "prazos do protesto").${S.cfg.gk?"":" <b>Conecte o Gemini na aba Ajustes.</b>"}</p>
       <div class="grid2"><select id="ia-tipo">
@@ -5525,8 +5525,14 @@ function iniciarSessao(tudo){const h=hojeKey();
   fila=S.cards.filter(c=>tudo||c.due<=h).slice();iniSessPlacar();
   for(let i=fila.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[fila[i],fila[j]]=[fila[j],fila[i]]}
   proximoCard()}
+/* filtro do bloco "Revisar": a área "__erros" seleciona os cartões vindos do Caderno de Erros */
+function casaFiltroRev(c){
+  var okLei=(!revLei||c.lei===revLei||c.tema===revLei);
+  if(revMat==="__erros") return String(c.src||"").indexOf("erro:")===0 && okLei;
+  return (!revMat||c.m===revMat) && okLei;
+}
 function iniciarSessaoFiltrada(tudo){const h=hojeKey();
-  fila=S.cards.filter(function(c){return (tudo||c.due<=h) && (!revMat||c.m===revMat) && (!revLei||c.lei===revLei||c.tema===revLei);});
+  fila=S.cards.filter(function(c){return (tudo||c.due<=h) && casaFiltroRev(c);});
   if(!fila.length){alert(tudo?"Nenhum flashcard nesse filtro.":"Nenhum flashcard vencido nesse filtro. 🎉");return;}
   iniSessPlacar();
   for(let i=fila.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[fila[i],fila[j]]=[fila[j],fila[i]]}
